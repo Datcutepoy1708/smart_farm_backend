@@ -26,12 +26,12 @@ export class User {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @OneToMany(() => Barn, (barn) => barn.user)
+  @OneToMany(() => Barn, (barn) => barn.user, { onDelete: 'CASCADE' })
   barns: Barn[];
 
-  @OneToMany(() => Note, (note) => note.user)
+  @OneToMany(() => Note, (note) => note.user, { onDelete: 'CASCADE' })
   notes: Note[];
 
-  @OneToMany(() => FarmAiChat, (chat) => chat.user)
+  @OneToMany(() => FarmAiChat, (chat) => chat.user, { onDelete: 'CASCADE' })
   farmAiChats: FarmAiChat[];
 }
