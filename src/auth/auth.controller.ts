@@ -14,9 +14,23 @@ import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
+export interface RequestUser {
+  userId: number;
+  email: string;
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Get('test')
+  async test() {
+    return {
+      success: true,
+      message: 'Auth API is working',
+      timestamp: new Date().toISOString(),
+    };
+  }
 
   @Post('register')
   async register(@Body() registerDto: RegisterDto) {
@@ -31,7 +45,7 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  async getMe(@CurrentUser() user: any) {
+  async getMe(@CurrentUser() user: RequestUser) {
     return this.authService.getMe(user.userId);
   }
 }
