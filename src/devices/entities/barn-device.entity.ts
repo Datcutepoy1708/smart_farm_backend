@@ -30,9 +30,9 @@ export class BarnDevice {
     type: 'enum',
     enum: DeviceType,
   })
-  deviceType: DeviceType;
+  deviceType: string;
 
-  @Column({ name: 'mqtt_topic', nullable: true })
+  @Column({ name: 'mqtt_topic' })
   mqttTopic: string;
 
   @Column({
@@ -41,7 +41,7 @@ export class BarnDevice {
     enum: DeviceStatus,
     default: DeviceStatus.OFF,
   })
-  currentStatus: DeviceStatus;
+  currentStatus: string;
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;

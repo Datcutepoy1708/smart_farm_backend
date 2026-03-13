@@ -9,6 +9,11 @@ export enum TriggerType {
   AUTO = 'auto',
 }
 
+export enum DeviceAction {
+  ON = 'ON',
+  OFF = 'OFF',
+}
+
 @Entity('device_logs')
 export class DeviceLog {
   @PrimaryGeneratedColumn({ type: 'bigint' })
@@ -20,8 +25,11 @@ export class DeviceLog {
   @Column({ name: 'device_id' })
   deviceId: number;
 
-  @Column()
-  action: string; // ON/OFF
+  @Column({
+    type: 'enum',
+    enum: DeviceAction,
+  })
+  action: string; 
 
   @Column({
     name: 'triggered_by',
@@ -29,7 +37,7 @@ export class DeviceLog {
     enum: TriggerType,
     default: TriggerType.MANUAL,
   })
-  triggeredBy: TriggerType;
+  triggeredBy: string;
 
   @Column({ name: 'user_id', nullable: true })
   userId: number;
