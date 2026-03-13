@@ -20,9 +20,7 @@ import { AlertsModule } from './alerts/alerts.module';
 import { NotesModule } from './notes/notes.module';
 import { FarmAiModule } from './farm-ai/farm-ai.module';
 import { MqttModule } from './mqtt/mqtt.module';
-
-// Gateway
-import { EventsGateway } from './gateway/events.gateway';
+import { GatewayModule } from './gateway/gateway.module';
 
 // Entities
 import { User } from './auth/entities/user.entity';
@@ -113,8 +111,9 @@ import { YoloDetectionLog } from './farm-ai/entities/yolo-detection-log.entity';
     NotesModule,
     FarmAiModule,
     MqttModule,
+    GatewayModule,
   ],
   controllers: [AppController],
-  providers: [AppService, EventsGateway],
+  providers: [AppService],
 })
 export class AppModule {}
