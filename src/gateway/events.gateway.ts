@@ -21,6 +21,15 @@ interface JoinFarmPayload {
   userId: number;
 }
 
+export interface AlertPayload {
+  id: number;
+  barnId: number;
+  alertType: string;
+  severity: string;
+  message: string;
+  createdAt: Date;
+}
+
 @WebSocketGateway({
   cors: {
     origin: '*',
@@ -71,6 +80,17 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(room).emit('farm:overview:update', data);
     this.logger.debug(
       `📡 Emitted farm:overview:update to ${room}: Barn${data.barnId} ${data.temperature}°C`,
+    );
+  }
+
+  /**
+   * Emit alert mới tới room farm_{userId}
+   */
+  emitNewAlert(userId: number, alert: AlertPayload) {
+    const room = `farm_${userId}`;
+    this.server.to(room).emit('alert:new', alert);
+    this.logger.debug(
+      `🔔 Emitted alert:new to ${room}: [${alert.severity}] ${alert.message}`,
     );
   }
 }

@@ -12,6 +12,7 @@ import * as mqtt from 'mqtt';
 import { EnvironmentLog } from '../environment/entities/environment-log.entity';
 import { Barn } from '../barns/entities/barn.entity';
 import { EventsGateway } from '../gateway/events.gateway';
+import { AlertsService } from '../alerts/alerts.service';
 
 // API sẽ kết nối sau:
 // GET  /api/barns/:barnId/environment  → lấy dữ liệu sensor
@@ -44,6 +45,8 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
     @InjectRepository(Barn)
     private barnRepository: Repository<Barn>,
+
+    private alertsService: AlertsService,
   ) {}
 
   onModuleInit() {
@@ -129,12 +132,33 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       // Kiểm tra ngưỡng cảnh báo
       if (data.temperature > 35) {
         this.logger.warn('🔴 CẢNH BÁO: Nhiệt độ cao!');
-      }
-      if (data.temperature < 15) {
+        await this.alertsService.createAlert(
+          barnId,
+          'high_temp',
+          'critical',
+          `Nhiệt độ cao bất thường: ${data.temperature}°C`,
+          { temperature: data.temperature }
+        );
+      } else if (data.temperature < 15) {
         this.logger.warn('🔵 CẢNH BÁO: Nhiệt độ thấp!');
+        await this.alertsService.createAlert(
+          barnId,
+          'low_temp',
+          'warning',
+          `Nhiệt độ thấp: ${data.temperature}°C`,
+          { temperature: data.temperature }
+        );
       }
+      
       if (data.humidity > 85) {
         this.logger.warn('💧 CẢNH BÁO: Độ ẩm cao!');
+        await this.alertsService.createAlert(
+          barnId,
+          'high_humidity',
+          'warning',
+          `Độ ẩm cao: ${data.humidity}%`,
+          { humidity: data.humidity }
+        );
       }
 
       // Lưu vào environment_logs
