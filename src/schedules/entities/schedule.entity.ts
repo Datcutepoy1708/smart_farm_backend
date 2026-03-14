@@ -4,7 +4,7 @@ import { BarnDevice } from '../../devices/entities/barn-device.entity';
 
 @Entity('schedules')
 export class Schedule {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn({ type: 'bigint' })
   id: number;
 
   @Column({ name: 'barn_id' })
@@ -16,13 +16,13 @@ export class Schedule {
   @Column()
   name: string;
 
-  @Column({ name: 'scheduled_time', type: 'time' })
+  @Column({ name: 'scheduled_time', type: 'varchar', length: 5 })
   scheduledTime: string;
 
-  @Column({ name: 'duration_seconds', type: 'int', default: 0 })
+  @Column({ name: 'duration_seconds', type: 'int', default: 30 })
   durationSeconds: number;
 
-  @Column({ name: 'days_of_week', type: 'int', array: true, default: [] })
+  @Column({ name: 'days_of_week', type: 'int', array: true })
   daysOfWeek: number[];
 
   @Column({ name: 'feed_amount_gram', type: 'int', nullable: true })

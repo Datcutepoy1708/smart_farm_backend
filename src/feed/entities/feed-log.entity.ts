@@ -48,7 +48,7 @@ export class FeedLog {
   @JoinColumn({ name: 'device_id' })
   device: BarnDevice;
 
-  @ManyToOne(() => Schedule)
+  @ManyToOne(() => Schedule, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'schedule_id' })
   schedule: Schedule;
 }
