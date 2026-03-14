@@ -28,12 +28,12 @@ export class FarmAiChat {
   content: string;
 
   @Column({ name: 'context_data', type: 'jsonb', nullable: true })
-  contextData: any;
+  contextData: Record<string, unknown>;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @ManyToOne(() => User, (user) => user.farmAiChats)
+  @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })
   user: User;
 

@@ -35,6 +35,7 @@ interface AlertPayload {
 export class MqttService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MqttService.name);
   private client: mqtt.MqttClient | null = null;
+  private readonly topicPrefix: string;
 
   constructor(
     private configService: ConfigService,
@@ -47,13 +48,16 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     private barnRepository: Repository<Barn>,
 
     private alertsService: AlertsService,
-  ) {}
+  ) {
+    this.topicPrefix = this.configService.get<string>('MQTT_TOPIC_PREFIX') || 'smartfarm_datcutepoy_2026';
+  }
 
   onModuleInit() {
     const brokerUrl = this.configService.get<string>('MQTT_BROKER_URL') || 'mqtt://localhost:1883';
     const username = this.configService.get<string>('MQTT_USERNAME') || '';
     const password = this.configService.get<string>('MQTT_PASSWORD') || '';
     const clientId = this.configService.get<string>('MQTT_CLIENT_ID') || 'smart_farm_backend_client';
+
 
     this.logger.log(`🔌 Đang kết nối MQTT broker: ${brokerUrl}`);
 
@@ -69,7 +73,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       this.logger.log('✅ Đã kết nối MQTT broker thành công!');
 
       // Subscribe các topics
-      this.client?.subscribe('farm/+/sensors', (err) => {
+      this.client?.subscribe(`${this.topicPrefix}/+/sensors`, (err) => {
         if (err) {
           this.logger.error('❌ Lỗi subscribe farm/+/sensors:', err.message);
         } else {
@@ -77,7 +81,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
         }
       });
 
-      this.client?.subscribe('farm/+/alert', (err) => {
+      this.client?.subscribe(`${this.topicPrefix}/+/alert`, (err) => {
         if (err) {
           this.logger.error('❌ Lỗi subscribe farm/+/alert:', err.message);
         } else {
@@ -89,9 +93,9 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     this.client.on('message', (topic: string, message: Buffer) => {
       const payload = message.toString();
 
-      if (topic.match(/^farm\/[^/]+\/sensors$/)) {
+      if (topic.includes('/sensors')) {
         this.handleSensorData(topic, payload);
-      } else if (topic.match(/^farm\/[^/]+\/alert$/)) {
+      } else if (topic.includes('/alert')) {
         this.handleAlertData(topic, payload);
       }
     });
@@ -121,8 +125,26 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       const barnSegment = topicParts[1]; // "barn1"
       const barnIdFromTopic = parseInt(barnSegment.replace(/\D/g, ''), 10);
 
-      const data: SensorPayload = JSON.parse(payload);
-      const barnId = data.barn_id || barnIdFromTopic;
+      const data: any = JSON.parse(payload);
+      const barnId = data.barn_id || barnIdFromTopic || 1; // Default fallback to 1
+
+      // Translate Greenhouse deep object payloads to standard flat schema
+      if (data.environment && typeof data.environment === 'object') {
+         data.temperature = data.environment.temp_c;
+         data.humidity = data.environment.humidity_pct;
+      }
+
+      // Ensure numbers are valid
+      const temp = Number(data.temperature);
+      const hum = Number(data.humidity);
+      
+      if (isNaN(temp) || isNaN(hum)) {
+        this.logger.error(`❌ Dữ liệu sensor không hợp lệ (NaN): ${payload}`);
+        return;
+      }
+
+      data.temperature = temp;
+      data.humidity = hum;
 
       this.logger.log(
         `🌡️ Barn${barnId}: ${data.temperature}°C | ${data.humidity}%` +
