@@ -1,191 +1,123 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-
 import { Barn, BarnStatus } from './entities/barn.entity';
+import { Flock, FlockStatus } from '../flocks/entities/flock.entity';
 import { EnvironmentLog } from '../environment/entities/environment-log.entity';
 import { Alert } from '../alerts/entities/alert.entity';
-import { Flock, FlockStatus } from '../flocks/entities/flock.entity';
-import { CreateBarnDto } from './dto/create-barn.dto';
-
-interface BarnOverviewItem {
-  id: number;
-  name: string;
-  chickenCount: number;
-  temperature: number | null;
-  humidity: number | null;
-  status: string;
-}
-
-export interface Activity {
-  id: number;
-  type: 'alert' | 'feeding' | 'device' | 'note';
-  title: string;
-  description: string;
-  barnName: string;
-  createdAt: string;
-}
-
-export interface FarmOverview {
-  totalBarns: number;
-  totalChickens: number;
-  avgTemperature: number;
-  avgHumidity: number;
-  unreadAlerts: number;
-  barns: BarnOverviewItem[];
-  recentActivities: Activity[];
-}
 
 @Injectable()
 export class BarnsService {
   constructor(
     @InjectRepository(Barn)
-    private barnRepository: Repository<Barn>,
-
-    @InjectRepository(EnvironmentLog)
-    private environmentLogRepository: Repository<EnvironmentLog>,
-
-    @InjectRepository(Alert)
-    private alertRepository: Repository<Alert>,
+    private readonly barnRepo: Repository<Barn>,
 
     @InjectRepository(Flock)
-    private flockRepository: Repository<Flock>,
+    private readonly flockRepo: Repository<Flock>,
+
+    @InjectRepository(EnvironmentLog)
+    private readonly envLogRepo: Repository<EnvironmentLog>,
+
+    @InjectRepository(Alert)
+    private readonly alertRepo: Repository<Alert>,
   ) {}
 
-  async getBarns(userId: number) {
-    const barns = await this.barnRepository.find({
-      where: { userId },
-      order: { createdAt: 'DESC' },
-    });
+  /** GET /barns/overview — tổng quan toàn trang trại của user */
+  async getOverview(userId: number) {
+    const barns = await this.barnRepo.find({ where: { userId } });
 
-    return {
-      success: true,
-      data: barns,
-    };
-  }
+    const barnSummaries = await Promise.all(
+      barns.map(async (barn) => {
+        // Lấy số gà hiện tại từ flock đang active
+        const activeFlock = await this.flockRepo.findOne({
+          where: { barnId: barn.id, status: FlockStatus.ACTIVE },
+          order: { startDate: 'DESC' },
+        });
 
-  async getBarnById(id: number) {
-    const barn = await this.barnRepository.findOne({
-      where: { id },
-      relations: ['flocks', 'devices'],
-    });
+        // Lấy log môi trường mới nhất
+        const latestEnvLog = await this.envLogRepo.findOne({
+          where: { barnId: barn.id },
+          order: { recordedAt: 'DESC' },
+        });
 
-    if (!barn) {
-      throw new NotFoundException(`Barn với id ${id} không tồn tại`);
+        return {
+          id: barn.id,
+          name: barn.name,
+          chickenCount: activeFlock?.currentCount ?? 0,
+          temperature: latestEnvLog?.temperature ?? null,
+          humidity: latestEnvLog?.humidity ?? null,
+          status: barn.status,
+        };
+      }),
+    );
+
+    // Tổng gà
+    const totalChickens = barnSummaries.reduce((s, b) => s + b.chickenCount, 0);
+
+    // Nhiệt độ & độ ẩm trung bình (chỉ tính barn có dữ liệu)
+    const validTemps = barnSummaries.map((b) => b.temperature).filter((t): t is number => t !== null);
+    const validHums = barnSummaries.map((b) => b.humidity).filter((h): h is number => h !== null);
+
+    const avgTemperature =
+      validTemps.length > 0
+        ? Math.round((validTemps.reduce((a, b) => a + b, 0) / validTemps.length) * 10) / 10
+        : 0;
+
+    const avgHumidity =
+      validHums.length > 0
+        ? Math.round((validHums.reduce((a, b) => a + b, 0) / validHums.length) * 10) / 10
+        : 0;
+
+    // Đếm cảnh báo chưa đọc của tất cả barns
+    const barnIds = barns.map((b) => b.id);
+    let unreadAlerts = 0;
+    if (barnIds.length > 0) {
+      unreadAlerts = await this.alertRepo
+        .createQueryBuilder('alert')
+        .where('alert.barnId IN (:...barnIds)', { barnIds })
+        .andWhere('alert.isRead = :isRead', { isRead: false })
+        .getCount();
     }
 
-    // Lấy environment_log mới nhất của barn
-    const latestLog = await this.environmentLogRepository.findOne({
-      where: { barnId: id },
-      order: { recordedAt: 'DESC' },
-    });
-
     return {
-      success: true,
-      data: {
-        ...barn,
-        latestEnvironment: latestLog
-          ? {
-              temperature: latestLog.temperature,
-              humidity: latestLog.humidity,
-              recordedAt: latestLog.recordedAt,
-            }
-          : null,
-      },
+      totalBarns: barns.length,
+      totalChickens,
+      avgTemperature,
+      avgHumidity,
+      unreadAlerts,
+      barns: barnSummaries,
     };
   }
 
-  async createBarn(userId: number, dto: CreateBarnDto) {
-    const barn = this.barnRepository.create({
+  /** GET /barns */
+  async getAll(userId: number): Promise<Barn[]> {
+    return this.barnRepo.find({ where: { userId }, order: { createdAt: 'DESC' } });
+  }
+
+  /** GET /barns/:id */
+  async getOne(id: number, userId: number): Promise<Barn> {
+    const barn = await this.barnRepo.findOne({ where: { id, userId } });
+    if (!barn) throw new NotFoundException(`Barn #${id} not found`);
+    return barn;
+  }
+
+  /** POST /barns */
+  async create(userId: number, dto: { name: string; location?: string; capacity?: number }): Promise<Barn> {
+    const barn = this.barnRepo.create({
       userId,
       name: dto.name,
       location: dto.location,
       capacity: dto.capacity ?? 0,
-      status: dto.status ?? BarnStatus.ACTIVE,
+      status: BarnStatus.EMPTY,
     });
-
-    const savedBarn = await this.barnRepository.save(barn);
-
-    return {
-      success: true,
-      data: savedBarn,
-    };
+    return this.barnRepo.save(barn);
   }
 
-  async getFarmOverview(userId: number): Promise<{ success: true; data: FarmOverview }> {
-    // 1. Lấy tất cả barns của user
-    const barns = await this.barnRepository.find({
-      where: { userId },
-    });
-
-    // 2. Đếm unread alerts
-    const unreadAlerts = await this.alertRepository.count({
-      where: { isRead: false },
-    });
-
-    // 3. Lấy thông tin chi tiết từng barn
-    const barnOverviews: BarnOverviewItem[] = [];
-    let totalChickens = 0;
-    const temperatures: number[] = [];
-    const humidities: number[] = [];
-
-    for (const barn of barns) {
-      // Lấy flock active của barn
-      const activeFlock = await this.flockRepository.findOne({
-        where: { barnId: barn.id, status: FlockStatus.ACTIVE },
-        order: { createdAt: 'DESC' },
-      });
-
-      const chickenCount = activeFlock?.currentCount ?? 0;
-      totalChickens += chickenCount;
-
-      // Lấy environment_log mới nhất
-      const latestLog = await this.environmentLogRepository.findOne({
-        where: { barnId: barn.id },
-        order: { recordedAt: 'DESC' },
-      });
-
-      if (latestLog) {
-        temperatures.push(latestLog.temperature);
-        humidities.push(latestLog.humidity);
-      }
-
-      barnOverviews.push({
-        id: barn.id,
-        name: barn.name,
-        chickenCount,
-        temperature: latestLog?.temperature ?? null,
-        humidity: latestLog?.humidity ?? null,
-        status: barn.status,
-      });
-    }
-
-    // 4. Tính trung bình
-    const avgTemperature =
-      temperatures.length > 0
-        ? Math.round(
-            (temperatures.reduce((a, b) => a + b, 0) / temperatures.length) * 10,
-          ) / 10
-        : 0;
-
-    const avgHumidity =
-      humidities.length > 0
-        ? Math.round(
-            (humidities.reduce((a, b) => a + b, 0) / humidities.length) * 10,
-          ) / 10
-        : 0;
-
-    return {
-      success: true,
-      data: {
-        totalBarns: barns.length,
-        totalChickens,
-        avgTemperature,
-        avgHumidity,
-        unreadAlerts,
-        barns: barnOverviews,
-        recentActivities: [], // TODO: implement later
-      },
-    };
+  /** PUT /barns/:id */
+  async update(id: number, userId: number, dto: Partial<{ name: string; location: string; capacity: number; status: BarnStatus }>): Promise<Barn> {
+    const barn = await this.getOne(id, userId);
+    Object.assign(barn, dto);
+    return this.barnRepo.save(barn);
   }
 }
+

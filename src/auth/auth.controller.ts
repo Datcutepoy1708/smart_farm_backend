@@ -14,11 +14,6 @@ import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
-export interface RequestUser {
-  userId: number;
-  email: string;
-}
-
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -45,7 +40,7 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  async getMe(@CurrentUser() user: RequestUser) {
+  async getMe(@CurrentUser() user: any) {
     return this.authService.getMe(user.userId);
   }
 }

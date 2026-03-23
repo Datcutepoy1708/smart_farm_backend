@@ -14,26 +14,26 @@ export class Barn {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', type: 'int' })
   userId: number;
 
-  @Column()
+  @Column({ type: 'varchar' })
   name: string;
 
-  @Column({ nullable: true })
-  location: string;
+  @Column({ type: 'varchar', nullable: true })
+  location: string | null;
 
   @Column({ type: 'int', default: 0 })
   capacity: number;
 
-  @Column({ name: 'current_flock', nullable: true })
-  currentFlock: number;
+  @Column({ name: 'current_flock', type: 'int', nullable: true })
+  currentFlock: number | null;
 
-  @Column({ name: 'batch_name', nullable: true })
-  batchName: string;
+  @Column({ name: 'batch_name', type: 'varchar', nullable: true })
+  batchName: string | null;
 
   @Column({ name: 'batch_start_date', type: 'timestamp', nullable: true })
-  batchStartDate: Date;
+  batchStartDate: Date | null;
 
   @Column({
     type: 'enum',
@@ -58,3 +58,4 @@ export class Barn {
   @OneToMany(() => BarnDevice, (device) => device.barn)
   devices: BarnDevice[];
 }
+

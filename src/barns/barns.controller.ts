@@ -1,47 +1,45 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  UseGuards,
-  ParseIntPipe,
-} from '@nestjs/common';
+import { Controller, Get, Post, Put, Param, Body, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { BarnsService } from './barns.service';
-import { CreateBarnDto } from './dto/create-barn.dto';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-
-interface RequestUser {
-  userId: number;
-  email: string;
-}
 
 @Controller('barns')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AuthGuard('jwt'))
 export class BarnsController {
   constructor(private readonly barnsService: BarnsService) {}
 
-  @Get()
-  async getBarns(@CurrentUser() user: RequestUser) {
-    return this.barnsService.getBarns(user.userId);
-  }
-
+  /** GET /api/barns/overview */
   @Get('overview')
-  async getFarmOverview(@CurrentUser() user: RequestUser) {
-    return this.barnsService.getFarmOverview(user.userId);
+  async getOverview(@Request() req: any) {
+    const userId: number = req.user.userId;
+    return this.barnsService.getOverview(userId);
   }
 
+  /** GET /api/barns */
+  @Get()
+  async getAll(@Request() req: any) {
+    return this.barnsService.getAll(req.user.userId);
+  }
+
+  /** GET /api/barns/:id */
   @Get(':id')
-  async getBarnById(@Param('id', ParseIntPipe) id: number) {
-    return this.barnsService.getBarnById(id);
+  async getOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.barnsService.getOne(id, req.user.userId);
   }
 
+  /** POST /api/barns */
   @Post()
-  async createBarn(
-    @CurrentUser() user: RequestUser,
-    @Body() dto: CreateBarnDto,
+  async create(@Body() body: { name: string; location?: string; capacity?: number }, @Request() req: any) {
+    return this.barnsService.create(req.user.userId, body);
+  }
+
+  /** PUT /api/barns/:id */
+  @Put(':id')
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { name?: string; location?: string; capacity?: number; status?: any },
+    @Request() req: any,
   ) {
-    return this.barnsService.createBarn(user.userId, dto);
+    return this.barnsService.update(id, req.user.userId, body);
   }
 }
+

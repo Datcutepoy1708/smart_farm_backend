@@ -15,17 +15,17 @@ export class Note {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', type: 'int' })
   userId: number;
 
-  @Column({ name: 'barn_id', nullable: true })
-  barnId: number;
+  @Column({ name: 'barn_id', type: 'int', nullable: true })
+  barnId: number | null;
 
-  @Column({ name: 'flock_id', nullable: true })
-  flockId: number;
+  @Column({ name: 'flock_id', type: 'int', nullable: true })
+  flockId: number | null;
 
-  @Column()
-  title: string;
+  @Column({ type: 'varchar', nullable: true })
+  title: string | null;
 
   @Column({ type: 'text' })
   content: string;
@@ -38,12 +38,12 @@ export class Note {
   tag: NoteTag;
 
   @Column({ name: 'reminder_at', type: 'timestamp', nullable: true })
-  reminderAt: Date;
+  reminderAt: Date | null;
 
-  @Column({ name: 'is_reminded', default: false })
+  @Column({ name: 'is_reminded', type: 'boolean', default: false })
   isReminded: boolean;
 
-  @Column({ name: 'is_archived', default: false })
+  @Column({ name: 'is_archived', type: 'boolean', default: false })
   isArchived: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
@@ -64,3 +64,4 @@ export class Note {
   @JoinColumn({ name: 'flock_id' })
   flock: Flock;
 }
+

@@ -1,63 +1,43 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-  ParseIntPipe,
-} from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { NotesService } from './notes.service';
 import { CreateNoteDto } from './dto/create-note.dto';
-import { UpdateNoteDto } from './dto/update-note.dto';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-
-interface RequestUser {
-  userId: number;
-  email: string;
-}
 
 @Controller('notes')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AuthGuard('jwt'))
 export class NotesController {
   constructor(private readonly notesService: NotesService) {}
 
+  /** GET /api/notes */
   @Get()
-  async getNotes(
-    @CurrentUser() user: RequestUser,
-    @Query('barn_id') barnId?: string,
-  ) {
-    const parsedBarnId = barnId ? parseInt(barnId, 10) : undefined;
-    return this.notesService.getNotes(user.userId, parsedBarnId);
+  async getAll(@Request() req: any) {
+    const data = await this.notesService.getAll(req.user.userId);
+    return { success: true, data };
   }
 
-  @Get(':id')
-  async getNoteById(@Param('id', ParseIntPipe) id: number) {
-    return this.notesService.getNoteById(id);
-  }
-
+  /** POST /api/notes */
   @Post()
-  async createNote(
-    @CurrentUser() user: RequestUser,
-    @Body() dto: CreateNoteDto,
-  ) {
-    return this.notesService.createNote(user.userId, dto);
+  async create(@Body() dto: CreateNoteDto, @Request() req: any) {
+    const data = await this.notesService.create(req.user.userId, dto);
+    return { success: true, data };
   }
 
-  @Patch(':id')
-  async updateNote(
+  /** PUT /api/notes/:id */
+  @Put(':id')
+  async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateNoteDto,
+    @Body() dto: Partial<CreateNoteDto>,
+    @Request() req: any,
   ) {
-    return this.notesService.updateNote(id, dto);
+    const data = await this.notesService.update(id, req.user.userId, dto);
+    return { success: true, data };
   }
 
+  /** DELETE /api/notes/:id */
   @Delete(':id')
-  async deleteNote(@Param('id', ParseIntPipe) id: number) {
-    return this.notesService.deleteNote(id);
+  async remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    await this.notesService.remove(id, req.user.userId);
+    return { success: true };
   }
 }
+
