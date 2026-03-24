@@ -1,4 +1,11 @@
-import { Controller, Get, Param, Patch, ParseIntPipe, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Patch,
+  ParseIntPipe,
+  Query,
+} from '@nestjs/common';
 import { AlertsService } from './alerts.service';
 
 @Controller()

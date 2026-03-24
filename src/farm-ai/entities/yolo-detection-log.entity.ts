@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Barn } from '../../barns/entities/barn.entity';
 import { Flock } from '../../flocks/entities/flock.entity';
 
@@ -22,7 +29,13 @@ export class YoloDetectionLog {
   @Column({ type: 'jsonb', nullable: true })
   behaviors: any;
 
-  @Column({ name: 'confidence_avg', type: 'decimal', precision: 4, scale: 3, default: 0 })
+  @Column({
+    name: 'confidence_avg',
+    type: 'decimal',
+    precision: 4,
+    scale: 3,
+    default: 0,
+  })
   confidenceAvg: number;
 
   @Column({ name: 'image_path', nullable: true })

@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Barn } from '../../barns/entities/barn.entity';
 
 export enum FlockStage {
@@ -42,7 +50,13 @@ export class Flock {
   @Column({ name: 'actual_end_date', type: 'timestamp', nullable: true })
   actualEndDate: Date;
 
-  @Column({ name: 'avg_weight_kg', type: 'decimal', precision: 5, scale: 3, default: 0 })
+  @Column({
+    name: 'avg_weight_kg',
+    type: 'decimal',
+    precision: 5,
+    scale: 3,
+    default: 0,
+  })
   avgWeightKg: number;
 
   @Column({ name: 'current_age_days', type: 'int', default: 0 })

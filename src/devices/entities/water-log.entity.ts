@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
+} from 'typeorm';
 import { Barn } from '../../barns/entities/barn.entity';
 import { BarnDevice } from './barn-device.entity';
 
@@ -27,32 +34,32 @@ export class WaterLog {
   @JoinColumn({ name: 'device_id' })
   device: BarnDevice | null;
 
-  @Column({ 
-    name: 'duration_seconds', 
-    nullable: true, 
-    type: 'int' 
+  @Column({
+    name: 'duration_seconds',
+    nullable: true,
+    type: 'int',
   })
   durationSeconds: number | null;
 
-  @Column({ 
-    name: 'water_level_before', 
-    nullable: true, 
-    type: 'float' 
+  @Column({
+    name: 'water_level_before',
+    nullable: true,
+    type: 'float',
   })
   waterLevelBefore: number | null;
 
-  @Column({ 
-    name: 'water_level_after', 
-    nullable: true, 
-    type: 'float' 
+  @Column({
+    name: 'water_level_after',
+    nullable: true,
+    type: 'float',
   })
   waterLevelAfter: number | null;
 
-  @Column({ 
-    name: 'triggered_by', 
-    type: 'enum', 
+  @Column({
+    name: 'triggered_by',
+    type: 'enum',
     enum: WaterTriggeredBy,
-    default: WaterTriggeredBy.SCHEDULE 
+    default: WaterTriggeredBy.SCHEDULE,
   })
   triggeredBy: WaterTriggeredBy;
 

@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
+} from 'typeorm';
 import { Barn } from '../../barns/entities/barn.entity';
 
 export enum SensorType {
@@ -32,24 +39,24 @@ export class BarnSensor {
   @Column({ name: 'mqtt_topic' })
   mqttTopic: string;
 
-  @Column({ 
-    name: 'calibration_offset', 
-    type: 'float', 
-    default: 0.0 
+  @Column({
+    name: 'calibration_offset',
+    type: 'float',
+    default: 0.0,
   })
   calibrationOffset: number;
 
-  @Column({ 
-    name: 'is_active', 
-    type: 'boolean', 
-    default: true 
+  @Column({
+    name: 'is_active',
+    type: 'boolean',
+    default: true,
   })
   isActive: boolean;
 
-  @Column({ 
-    name: 'last_seen_at', 
-    type: 'timestamp', 
-    nullable: true 
+  @Column({
+    name: 'last_seen_at',
+    type: 'timestamp',
+    nullable: true,
   })
   lastSeenAt: Date | null;
 

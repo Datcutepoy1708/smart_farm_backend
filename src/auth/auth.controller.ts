@@ -1,9 +1,9 @@
-import { 
-  Controller, 
-  Post, 
-  Get, 
-  Body, 
-  UseGuards, 
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  UseGuards,
   Request,
   HttpCode,
   HttpStatus,

@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  ParseIntPipe,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { DevicesService } from './devices.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -42,7 +51,11 @@ export class DevicesController {
     @Body() dto: ControlDeviceDto,
     @CurrentUser() user: RequestUser,
   ) {
-    const data = await this.devicesService.controlDevice(id, dto.action, user.userId);
+    const data = await this.devicesService.controlDevice(
+      id,
+      dto.action,
+      user.userId,
+    );
     return { success: true, data };
   }
 

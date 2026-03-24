@@ -14,17 +14,17 @@ import { EnvironmentLog } from '../environment/entities/environment-log.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      FeedLog, 
-      FeedCalculation, 
-      NutritionStandard, 
-      WeightLog, 
-      Barn, 
-      Flock, 
-      EnvironmentLog
-    ])
+      FeedLog,
+      FeedCalculation,
+      NutritionStandard,
+      WeightLog,
+      Barn,
+      Flock,
+      EnvironmentLog,
+    ]),
   ],
   providers: [FeedService],
   controllers: [FeedController],
-  exports: [FeedService]
+  exports: [FeedService],
 })
 export class FeedModule {}

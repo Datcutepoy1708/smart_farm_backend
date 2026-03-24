@@ -1,4 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+} from 'typeorm';
 import { User } from '../../auth/entities/user.entity';
 import { Flock } from '../../flocks/entities/flock.entity';
 import { BarnDevice } from '../../devices/entities/barn-device.entity';
@@ -58,4 +67,3 @@ export class Barn {
   @OneToMany(() => BarnDevice, (device) => device.barn)
   devices: BarnDevice[];
 }
-

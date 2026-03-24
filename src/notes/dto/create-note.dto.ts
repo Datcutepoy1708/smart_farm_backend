@@ -21,4 +21,3 @@ export class CreateNoteDto {
   @IsNumber()
   flockId?: number;
 }
-

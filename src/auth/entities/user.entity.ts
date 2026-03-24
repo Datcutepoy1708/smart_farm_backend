@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from 'typeorm';
 import { Barn } from '../../barns/entities/barn.entity';
 import { Note } from '../../notes/entities/note.entity';
 import { FarmAiChat } from '../../farm-ai/entities/farm-ai-chat.entity';

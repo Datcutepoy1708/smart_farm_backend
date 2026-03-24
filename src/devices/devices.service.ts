@@ -38,7 +38,9 @@ export class DevicesService {
   }
 
   async controlDevice(deviceId: number, action: string, userId: number) {
-    const device = await this.barnDeviceRepository.findOne({ where: { id: deviceId } });
+    const device = await this.barnDeviceRepository.findOne({
+      where: { id: deviceId },
+    });
     if (!device) {
       throw new NotFoundException('Device not found');
     }

@@ -1,4 +1,11 @@
-import { Controller, Get, Param, Query, ParseIntPipe, DefaultValuePipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  ParseIntPipe,
+  DefaultValuePipe,
+} from '@nestjs/common';
 import { FeedService } from './feed.service';
 
 @Controller('barns/:barnId/feed')
@@ -18,7 +25,7 @@ export class FeedController {
   @Get('history')
   async getFeedHistory(
     @Param('barnId', ParseIntPipe) barnId: number,
-    @Query('days', new DefaultValuePipe(7), ParseIntPipe) days: number
+    @Query('days', new DefaultValuePipe(7), ParseIntPipe) days: number,
   ) {
     return this.feedService.getFeedHistory(barnId, days);
   }

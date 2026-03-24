@@ -45,9 +45,9 @@ export class AuthService {
     const savedUser = await this.userRepository.save(user);
 
     // Generate JWT token
-    const payload = { 
-      sub: savedUser.id, 
-      email: savedUser.email 
+    const payload = {
+      sub: savedUser.id,
+      email: savedUser.email,
     };
 
     const token = this.jwtService.sign(payload);
@@ -86,9 +86,9 @@ export class AuthService {
     }
 
     // Generate JWT token
-    const payload = { 
-      sub: user.id, 
-      email: user.email 
+    const payload = {
+      sub: user.id,
+      email: user.email,
     };
 
     const token = this.jwtService.sign(payload);

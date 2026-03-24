@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Barn } from '../../barns/entities/barn.entity';
 import { BarnDevice } from './barn-device.entity';
 import { User } from '../../auth/entities/user.entity';
@@ -29,7 +36,7 @@ export class DeviceLog {
     type: 'enum',
     enum: DeviceAction,
   })
-  action: string; 
+  action: string;
 
   @Column({
     name: 'triggered_by',

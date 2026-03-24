@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Barn } from '../../barns/entities/barn.entity';
 import { Flock } from '../../flocks/entities/flock.entity';
 import { BarnDevice } from '../../devices/entities/barn-device.entity';

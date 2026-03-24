@@ -1,4 +1,12 @@
-import { Controller, Post, Get, Body, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Query,
+  UseGuards,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { FarmAiService } from './farm-ai.service';
 import { ChatDto } from './dto/chat.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -18,7 +26,7 @@ export class FarmAiController {
   async chat(@CurrentUser() user: RequestUser, @Body() dto: ChatDto) {
     const userId = user.userId;
     const result = await this.farmAiService.chat(userId, dto);
-    
+
     return {
       success: true,
       data: result,
@@ -33,9 +41,13 @@ export class FarmAiController {
   ) {
     const userId = user.userId;
     const limitNum = limit ? parseInt(limit, 10) : 20;
-    
-    const history = await this.farmAiService.getChatHistory(userId, barnId, limitNum);
-    
+
+    const history = await this.farmAiService.getChatHistory(
+      userId,
+      barnId,
+      limitNum,
+    );
+
     return {
       success: true,
       data: history,

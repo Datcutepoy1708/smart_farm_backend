@@ -7,12 +7,9 @@ import { Barn } from '../barns/entities/barn.entity';
 import { GatewayModule } from '../gateway/gateway.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Alert, Barn]),
-    GatewayModule
-  ],
+  imports: [TypeOrmModule.forFeature([Alert, Barn]), GatewayModule],
   providers: [AlertsService],
   controllers: [AlertsController],
-  exports: [AlertsService]
+  exports: [AlertsService],
 })
 export class AlertsModule {}

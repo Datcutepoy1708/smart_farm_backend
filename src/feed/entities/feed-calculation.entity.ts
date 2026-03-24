@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Barn } from '../../barns/entities/barn.entity';
 import { Flock, FlockStage } from '../../flocks/entities/flock.entity';
 import { NutritionStandard } from './nutrition-standard.entity';
@@ -35,16 +42,32 @@ export class FeedCalculation {
   @Column({ name: 'env_temperature', type: 'decimal', precision: 4, scale: 2 })
   envTemperature: number;
 
-  @Column({ name: 'temp_adjustment_factor', type: 'decimal', precision: 4, scale: 2, default: 1.0 })
+  @Column({
+    name: 'temp_adjustment_factor',
+    type: 'decimal',
+    precision: 4,
+    scale: 2,
+    default: 1.0,
+  })
   tempAdjustmentFactor: number;
 
   @Column({ name: 'base_feed_gram', type: 'decimal', precision: 10, scale: 2 })
   baseFeedGram: number;
 
-  @Column({ name: 'recommended_feed_gram', type: 'decimal', precision: 10, scale: 2 })
+  @Column({
+    name: 'recommended_feed_gram',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+  })
   recommendedFeedGram: number;
 
-  @Column({ name: 'recommended_water_liter', type: 'decimal', precision: 10, scale: 2 })
+  @Column({
+    name: 'recommended_water_liter',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+  })
   recommendedWaterLiter: number;
 
   @CreateDateColumn({ name: 'calculated_at' })

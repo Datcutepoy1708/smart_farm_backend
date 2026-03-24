@@ -32,7 +32,11 @@ export class NotesService {
   }
 
   /** PUT /notes/:id — cập nhật ghi chú */
-  async update(id: number, userId: number, dto: Partial<CreateNoteDto>): Promise<Note> {
+  async update(
+    id: number,
+    userId: number,
+    dto: Partial<CreateNoteDto>,
+  ): Promise<Note> {
     const note = await this.noteRepo.findOne({ where: { id, userId } });
     if (!note) throw new NotFoundException(`Note #${id} không tồn tại`);
     Object.assign(note, dto);
@@ -47,4 +51,3 @@ export class NotesService {
     await this.noteRepo.save(note);
   }
 }
-

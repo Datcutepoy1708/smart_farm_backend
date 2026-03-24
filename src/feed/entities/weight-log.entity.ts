@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
+} from 'typeorm';
 import { Barn } from '../../barns/entities/barn.entity';
 import { Flock } from '../../flocks/entities/flock.entity';
 
@@ -21,29 +28,29 @@ export class WeightLog {
   @JoinColumn({ name: 'flock_id' })
   flock: Flock | null;
 
-  @Column({ 
-    name: 'total_weight_kg', 
-    type: 'float' 
+  @Column({
+    name: 'total_weight_kg',
+    type: 'float',
   })
   totalWeightKg: number;
 
-  @Column({ 
-    name: 'sample_count', 
-    type: 'int', 
-    default: 10 
+  @Column({
+    name: 'sample_count',
+    type: 'int',
+    default: 10,
   })
   sampleCount: number;
 
-  @Column({ 
-    name: 'avg_weight_kg', 
-    type: 'float' 
+  @Column({
+    name: 'avg_weight_kg',
+    type: 'float',
   })
   avgWeightKg: number;
 
-  @Column({ 
-    name: 'age_days', 
-    type: 'int', 
-    nullable: true 
+  @Column({
+    name: 'age_days',
+    type: 'int',
+    nullable: true,
   })
   ageDays: number | null;
 

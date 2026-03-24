@@ -10,4 +10,3 @@ import { Note } from './entities/note.entity';
   controllers: [NotesController],
 })
 export class NotesModule {}
-

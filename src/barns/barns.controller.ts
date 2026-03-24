@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Put, Param, Body, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Param,
+  Body,
+  ParseIntPipe,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { BarnsService } from './barns.service';
 
@@ -28,7 +38,10 @@ export class BarnsController {
 
   /** POST /api/barns */
   @Post()
-  async create(@Body() body: { name: string; location?: string; capacity?: number }, @Request() req: any) {
+  async create(
+    @Body() body: { name: string; location?: string; capacity?: number },
+    @Request() req: any,
+  ) {
     return this.barnsService.create(req.user.userId, body);
   }
 
@@ -36,10 +49,10 @@ export class BarnsController {
   @Put(':id')
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { name?: string; location?: string; capacity?: number; status?: any },
+    @Body()
+    body: { name?: string; location?: string; capacity?: number; status?: any },
     @Request() req: any,
   ) {
     return this.barnsService.update(id, req.user.userId, body);
   }
 }
-

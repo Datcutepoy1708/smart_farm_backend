@@ -49,15 +49,20 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
     private alertsService: AlertsService,
   ) {
-    this.topicPrefix = this.configService.get<string>('MQTT_TOPIC_PREFIX') || 'smartfarm_datcutepoy_2026';
+    this.topicPrefix =
+      this.configService.get<string>('MQTT_TOPIC_PREFIX') ||
+      'smartfarm_datcutepoy_2026';
   }
 
   onModuleInit() {
-    const brokerUrl = this.configService.get<string>('MQTT_BROKER_URL') || 'mqtt://localhost:1883';
+    const brokerUrl =
+      this.configService.get<string>('MQTT_BROKER_URL') ||
+      'mqtt://localhost:1883';
     const username = this.configService.get<string>('MQTT_USERNAME') || '';
     const password = this.configService.get<string>('MQTT_PASSWORD') || '';
-    const clientId = this.configService.get<string>('MQTT_CLIENT_ID') || 'smart_farm_backend_client';
-
+    const clientId =
+      this.configService.get<string>('MQTT_CLIENT_ID') ||
+      'smart_farm_backend_client';
 
     this.logger.log(`🔌 Đang kết nối MQTT broker: ${brokerUrl}`);
 
@@ -130,14 +135,14 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
       // Translate Greenhouse deep object payloads to standard flat schema
       if (data.environment && typeof data.environment === 'object') {
-         data.temperature = data.environment.temp_c;
-         data.humidity = data.environment.humidity_pct;
+        data.temperature = data.environment.temp_c;
+        data.humidity = data.environment.humidity_pct;
       }
 
       // Ensure numbers are valid
       const temp = Number(data.temperature);
       const hum = Number(data.humidity);
-      
+
       if (isNaN(temp) || isNaN(hum)) {
         this.logger.error(`❌ Dữ liệu sensor không hợp lệ (NaN): ${payload}`);
         return;
@@ -148,7 +153,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
       this.logger.log(
         `🌡️ Barn${barnId}: ${data.temperature}°C | ${data.humidity}%` +
-        (data.water_level !== undefined ? ` | 💧 ${data.water_level}%` : ''),
+          (data.water_level !== undefined ? ` | 💧 ${data.water_level}%` : ''),
       );
 
       // Kiểm tra ngưỡng cảnh báo
@@ -159,7 +164,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
           'high_temp',
           'critical',
           `Nhiệt độ cao bất thường: ${data.temperature}°C`,
-          { temperature: data.temperature }
+          { temperature: data.temperature },
         );
       } else if (data.temperature < 15) {
         this.logger.warn('🔵 CẢNH BÁO: Nhiệt độ thấp!');
@@ -168,10 +173,10 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
           'low_temp',
           'warning',
           `Nhiệt độ thấp: ${data.temperature}°C`,
-          { temperature: data.temperature }
+          { temperature: data.temperature },
         );
       }
-      
+
       if (data.humidity > 85) {
         this.logger.warn('💧 CẢNH BÁO: Độ ẩm cao!');
         await this.alertsService.createAlert(
@@ -179,7 +184,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
           'high_humidity',
           'warning',
           `Độ ẩm cao: ${data.humidity}%`,
-          { humidity: data.humidity }
+          { humidity: data.humidity },
         );
       }
 

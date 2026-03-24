@@ -42,13 +42,19 @@ export class SchedulesController {
     @Param('id', ParseIntPipe) id: number,
     @Body() updateScheduleDto: UpdateScheduleDto,
   ) {
-    const data = await this.schedulesService.updateSchedule(id, updateScheduleDto);
+    const data = await this.schedulesService.updateSchedule(
+      id,
+      updateScheduleDto,
+    );
     return { success: true, data };
   }
 
   @Delete('schedules/:id')
   async deleteSchedule(@Param('id', ParseIntPipe) id: number) {
     await this.schedulesService.deleteSchedule(id);
-    return { success: true, data: { message: 'Schedule deleted successfully' } };
+    return {
+      success: true,
+      data: { message: 'Schedule deleted successfully' },
+    };
   }
 }

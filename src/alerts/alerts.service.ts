@@ -32,11 +32,13 @@ export class AlertsService {
   }
 
   async markAsRead(alertId: number): Promise<Alert | null> {
-    const alert = await this.alertRepository.findOne({ where: { id: alertId } });
+    const alert = await this.alertRepository.findOne({
+      where: { id: alertId },
+    });
     if (!alert) {
       return null;
     }
-    
+
     alert.isRead = true;
     return this.alertRepository.save(alert);
   }
@@ -65,11 +67,11 @@ export class AlertsService {
     });
 
     const savedAlert = await this.alertRepository.save(alert);
-    
+
     // Find barn user to emit to the correct room
     const barn = await this.barnRepository.findOne({ where: { id: barnId } });
     // Assuming barn has user_id, if not we will emit to userId=1 (like in MQTT temporarily)
-    const userId = barn?.userId || 1; 
+    const userId = barn?.userId || 1;
 
     // Emit 'alert:new' via Socket.IO
     this.eventsGateway.emitNewAlert(userId, {
@@ -81,7 +83,9 @@ export class AlertsService {
       createdAt: savedAlert.createdAt,
     });
 
-    this.logger.log(`Created alert for Barn${barnId}: [${severity}] ${message}`);
+    this.logger.log(
+      `Created alert for Barn${barnId}: [${severity}] ${message}`,
+    );
 
     return savedAlert;
   }

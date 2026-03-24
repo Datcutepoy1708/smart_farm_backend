@@ -13,17 +13,11 @@ import { MqttModule } from '../mqtt/mqtt.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      Schedule,
-      BarnDevice,
-      DeviceLog,
-      FeedLog,
-      Flock,
-    ]),
+    TypeOrmModule.forFeature([Schedule, BarnDevice, DeviceLog, FeedLog, Flock]),
     MqttModule,
   ],
   providers: [SchedulesService],
   controllers: [SchedulesController],
-  exports: [SchedulesService]
+  exports: [SchedulesService],
 })
 export class SchedulesModule {}

@@ -55,17 +55,25 @@ export class BarnsService {
     const totalChickens = barnSummaries.reduce((s, b) => s + b.chickenCount, 0);
 
     // Nhiệt độ & độ ẩm trung bình (chỉ tính barn có dữ liệu)
-    const validTemps = barnSummaries.map((b) => b.temperature).filter((t): t is number => t !== null);
-    const validHums = barnSummaries.map((b) => b.humidity).filter((h): h is number => h !== null);
+    const validTemps = barnSummaries
+      .map((b) => b.temperature)
+      .filter((t): t is number => t !== null);
+    const validHums = barnSummaries
+      .map((b) => b.humidity)
+      .filter((h): h is number => h !== null);
 
     const avgTemperature =
       validTemps.length > 0
-        ? Math.round((validTemps.reduce((a, b) => a + b, 0) / validTemps.length) * 10) / 10
+        ? Math.round(
+            (validTemps.reduce((a, b) => a + b, 0) / validTemps.length) * 10,
+          ) / 10
         : 0;
 
     const avgHumidity =
       validHums.length > 0
-        ? Math.round((validHums.reduce((a, b) => a + b, 0) / validHums.length) * 10) / 10
+        ? Math.round(
+            (validHums.reduce((a, b) => a + b, 0) / validHums.length) * 10,
+          ) / 10
         : 0;
 
     // Đếm cảnh báo chưa đọc của tất cả barns
@@ -91,7 +99,10 @@ export class BarnsService {
 
   /** GET /barns */
   async getAll(userId: number): Promise<Barn[]> {
-    return this.barnRepo.find({ where: { userId }, order: { createdAt: 'DESC' } });
+    return this.barnRepo.find({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+    });
   }
 
   /** GET /barns/:id */
@@ -102,7 +113,10 @@ export class BarnsService {
   }
 
   /** POST /barns */
-  async create(userId: number, dto: { name: string; location?: string; capacity?: number }): Promise<Barn> {
+  async create(
+    userId: number,
+    dto: { name: string; location?: string; capacity?: number },
+  ): Promise<Barn> {
     const barn = this.barnRepo.create({
       userId,
       name: dto.name,
@@ -114,10 +128,18 @@ export class BarnsService {
   }
 
   /** PUT /barns/:id */
-  async update(id: number, userId: number, dto: Partial<{ name: string; location: string; capacity: number; status: BarnStatus }>): Promise<Barn> {
+  async update(
+    id: number,
+    userId: number,
+    dto: Partial<{
+      name: string;
+      location: string;
+      capacity: number;
+      status: BarnStatus;
+    }>,
+  ): Promise<Barn> {
     const barn = await this.getOne(id, userId);
     Object.assign(barn, dto);
     return this.barnRepo.save(barn);
   }
 }
-

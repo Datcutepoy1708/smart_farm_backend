@@ -114,7 +114,7 @@ export class FarmAiService {
 
     const history = historyData.reverse();
 
-    // Bước 3 — Gọi Gemini API
+    // Định nghĩa systemPrompt
     const systemPrompt = `Bạn là FarmAI - chuyên gia chăn nuôi gà thịt hỗ trợ nông dân Việt Nam.
 
 THÔNG TIN CHUỒNG HIỆN TẠI:
@@ -132,22 +132,52 @@ NGUYÊN TẮC TRẢ LỜI:
 - Đề xuất hành động cụ thể
 - Tối đa 150 từ mỗi câu trả lời`;
 
-    const modelOptions = {
-      model: this.configService.get<string>('GEMINI_MODEL') || 'gemini-1.5-flash',
-      systemInstruction: systemPrompt,
-    };
+    // Bước 3 — Gọi Gemini API với retry + fallback model
+    const primaryModel = this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.0-flash';
+    const fallbackModel = 'gemini-2.0-flash-lite';
+    const modelsToTry = [primaryModel, fallbackModel];
 
-    const model = this.genAI.getGenerativeModel(modelOptions);
+    let reply = '';
+    let lastError: any;
 
-    const chatSession = model.startChat({
-      history: history.map((msg) => ({
-        role: msg.role === ChatRole.USER ? 'user' : 'model',
-        parts: [{ text: msg.content }],
-      })),
-    });
+    for (const modelName of modelsToTry) {
+      try {
+        const model = this.genAI.getGenerativeModel({
+          model: modelName,
+          systemInstruction: systemPrompt,
+        });
 
-    const result = await chatSession.sendMessage(message);
-    const reply = result.response.text();
+        const chatSession = model.startChat({
+          history: history.map((msg) => ({
+            role: msg.role === ChatRole.USER ? 'user' : 'model',
+            parts: [{ text: msg.content }],
+          })),
+        });
+
+        const result = await chatSession.sendMessage(message);
+        reply = result.response.text();
+        break; // Thành công — thoát vòng lặp
+      } catch (err: any) {
+        lastError = err;
+        const is503 = err?.status === 503 || err?.statusText === 'Service Unavailable'
+          || String(err?.message || '').includes('503');
+        const is429 = err?.status === 429 || err?.statusText === 'Too Many Requests'
+          || String(err?.message || '').includes('429')
+          || String(err?.message || '').includes('exceeded your current quota');
+
+        if (!is503 && !is429) throw err; // Lỗi khác thì throw luôn
+        // 503 hoặc 429 → thử model tiếp theo
+      }
+    }
+
+    if (!reply) {
+      // Bị lỗi quá tải / giới hạn API
+      return {
+        reply: 'Xin lỗi, trợ lý AI đang bị quá tải giới hạn sử dụng (API Quota Limit). Vui lòng đợi và thử lại sau khoảng 1 phút.',
+        contextUsed,
+      };
+
+    }
 
     // Bước 4 — Lưu vào farm_ai_chats
     const userMessageEntity = this.farmAiChatRepository.create({
