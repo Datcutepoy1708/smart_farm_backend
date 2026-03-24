@@ -55,34 +55,52 @@ import { YoloDetectionLog } from './farm-ai/entities/yolo-detection-log.entity';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get<string>('DB_HOST'),
-        port: configService.get<number>('DB_PORT'),
-        username: configService.get<string>('DB_USERNAME'),
-        password: configService.get<string>('DB_PASSWORD'),
-        database: configService.get<string>('DB_NAME'),
-        entities: [
-          User,
-          Barn,
-          Flock,
-          BarnDevice,
-          BarnSensor,
-          WaterLog,
-          DeviceLog,
-          Schedule,
-          NutritionStandard,
-          FeedLog,
-          FeedCalculation,
-          WeightLog,
-          EnvironmentLog,
-          Alert,
-          Note,
-          FarmAiChat,
-          YoloDetectionLog,
-        ],
-        synchronize: true, // Auto generate schema from entities
-      }),
+      useFactory: (configService: ConfigService) => {
+        const databaseUrl = configService.get<string>('DATABASE_URL');
+
+        const baseConfig = {
+          type: 'postgres' as const,
+          entities: [
+            User,
+            Barn,
+            Flock,
+            BarnDevice,
+            BarnSensor,
+            WaterLog,
+            DeviceLog,
+            Schedule,
+            NutritionStandard,
+            FeedLog,
+            FeedCalculation,
+            WeightLog,
+            EnvironmentLog,
+            Alert,
+            Note,
+            FarmAiChat,
+            YoloDetectionLog,
+          ],
+          synchronize: false,
+        };
+
+        if (databaseUrl) {
+          // Railway / Production: use DATABASE_URL with SSL
+          return {
+            ...baseConfig,
+            url: databaseUrl,
+            ssl: { rejectUnauthorized: false },
+          };
+        }
+
+        // Local dev: use individual env vars
+        return {
+          ...baseConfig,
+          host: configService.get<string>('DB_HOST'),
+          port: configService.get<number>('DB_PORT'),
+          username: configService.get<string>('DB_USERNAME'),
+          password: configService.get<string>('DB_PASSWORD'),
+          database: configService.get<string>('DB_NAME'),
+        };
+      },
     }),
 
     // Global JWT

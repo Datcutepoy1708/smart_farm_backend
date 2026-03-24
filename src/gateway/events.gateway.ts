@@ -34,6 +34,7 @@ export interface AlertPayload {
   cors: {
     origin: '*',
   },
+  transports: ['websocket', 'polling'],
 })
 export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(EventsGateway.name);

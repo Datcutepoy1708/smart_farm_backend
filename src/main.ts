@@ -7,8 +7,7 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
-  const configService = app.get(ConfigService);
-  const port = configService.get<number>('PORT') || 3000;
+  const port = process.env.PORT || 3000;
 
   // Global Prefix: /api
   app.setGlobalPrefix('api');
@@ -25,7 +24,7 @@ async function bootstrap() {
     }),
   );
 
-  await app.listen(port);
-  logger.log(`Application is running on: http://localhost:${port}/api`);
+  await app.listen(port, '0.0.0.0');
+  logger.log(`Application is running on port ${port}`);
 }
 bootstrap();
