@@ -133,8 +133,8 @@ NGUYÊN TẮC TRẢ LỜI:
 - Tối đa 150 từ mỗi câu trả lời`;
 
     // Bước 3 — Gọi Gemini API với retry + fallback model
-    const primaryModel = this.configService.get<string>('GEMINI_MODEL') || 'gemini-1.5-flash';
-    const fallbackModel = 'gemini-1.5-pro';
+    const primaryModel = this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.5-flash';
+    const fallbackModel = 'gemini-2.5-pro';
     const modelsToTry = [primaryModel, fallbackModel];
 
     let reply = '';
