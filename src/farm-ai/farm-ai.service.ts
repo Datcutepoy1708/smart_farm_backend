@@ -133,8 +133,8 @@ NGUYÊN TẮC TRẢ LỜI:
 - Tối đa 150 từ mỗi câu trả lời`;
 
     // Bước 3 — Gọi Gemini API với retry + fallback model
-    const primaryModel = this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.0-flash';
-    const fallbackModel = 'gemini-2.0-flash-lite';
+    const primaryModel = this.configService.get<string>('GEMINI_MODEL') || 'gemini-1.5-flash';
+    const fallbackModel = 'gemini-1.5-pro';
     const modelsToTry = [primaryModel, fallbackModel];
 
     let reply = '';
@@ -159,6 +159,7 @@ NGUYÊN TẮC TRẢ LỜI:
         break; // Thành công — thoát vòng lặp
       } catch (err: any) {
         lastError = err;
+        console.error(`[FarmAI] Error with model ${modelName}:`, err?.message || err);
         const is503 = err?.status === 503 || err?.statusText === 'Service Unavailable'
           || String(err?.message || '').includes('503');
         const is429 = err?.status === 429 || err?.statusText === 'Too Many Requests'
@@ -171,6 +172,7 @@ NGUYÊN TẮC TRẢ LỜI:
     }
 
     if (!reply) {
+      console.error('[FarmAI] All models failed. Last error:', lastError?.message || lastError);
       // Bị lỗi quá tải / giới hạn API
       return {
         reply: 'Xin lỗi, trợ lý AI đang bị quá tải giới hạn sử dụng (API Quota Limit). Vui lòng đợi và thử lại sau khoảng 1 phút.',
