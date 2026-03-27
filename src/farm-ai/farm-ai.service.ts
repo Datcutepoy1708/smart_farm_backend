@@ -16,6 +16,7 @@ import { FeedLog } from '../feed/entities/feed-log.entity';
 @Injectable()
 export class FarmAiService {
   private genAI: GoogleGenerativeAI;
+  private activeRequests = new Set<string>();
 
   constructor(
     private configService: ConfigService,
@@ -44,6 +45,17 @@ export class FarmAiService {
   async chat(userId: number, dto: ChatDto) {
     const { barnId, message } = dto;
 
+    // Chống spam request
+    const requestKey = `${userId}-${barnId}`;
+    if (this.activeRequests.has(requestKey)) {
+      return {
+        reply: 'Hệ thống đang xử lý tin nhắn trước của bạn, vui lòng đợi trong giây lát.',
+        contextUsed: null,
+      };
+    }
+    this.activeRequests.add(requestKey);
+
+    try {
     // Bước 1 — Lấy context data
     const barn = await this.barnRepository.findOne({ where: { id: barnId } });
     if (!barn) {
@@ -86,7 +98,7 @@ export class FarmAiService {
     const activeAlertsList = await this.alertRepository.find({
       where: { barnId: barnId, isRead: false },
       order: { createdAt: 'DESC' },
-      take: 5, // Just get some latest ones to save token space
+      take: 2, // Just get some latest ones to save token space
     });
 
     const alertDetails = activeAlertsList.map((a) => a.message).join('; ') || 'Không có';
@@ -105,80 +117,59 @@ export class FarmAiService {
       active_alerts: `${activeAlertsCount} (${alertDetails})`,
     };
 
-    // Bước 2 — Lấy 10 tin nhắn gần nhất
+    // Bước 2 — Lấy 4 tin nhắn gần nhất
     const historyData = await this.farmAiChatRepository.find({
       where: { userId, barnId },
       order: { createdAt: 'DESC' },
-      take: 10,
+      take: 4,
     });
 
     const history = historyData.reverse();
 
     // Định nghĩa systemPrompt
-    const systemPrompt = `Bạn là FarmAI - chuyên gia chăn nuôi gà thịt hỗ trợ nông dân Việt Nam.
+    const systemPrompt = `Bạn là FarmAI - chuyên gia nông nghiệp Việt Nam.
 
-THÔNG TIN CHUỒNG HIỆN TẠI:
-- Tên chuồng: ${contextUsed.barn_name}
-- Số lượng gà: ${contextUsed.chicken_count} con
+THÔNG TIN HIỆN TẠI:
+- Chuồng: ${contextUsed.barn_name}
+- Số gà: ${contextUsed.chicken_count} con
 - Nhiệt độ: ${contextUsed.temperature}°C | Độ ẩm: ${contextUsed.humidity}%
-- Cân nặng trung bình: ${contextUsed.avg_weight}kg
-- Tuổi đàn: ${contextUsed.age_days} ngày (giai đoạn: ${contextUsed.stage})
-- Thức ăn hôm nay: ${contextUsed.feed_today}g / ${contextUsed.recommended}g
-- Cảnh báo hiện tại: ${contextUsed.active_alerts}
+- Cân nặng TB: ${contextUsed.avg_weight}kg
+- Tuổi: ${contextUsed.age_days} ngày (${contextUsed.stage})
+- Thức ăn: ${contextUsed.feed_today}g/${contextUsed.recommended}g
+- Cảnh báo: ${contextUsed.active_alerts}
 
-NGUYÊN TẮC TRẢ LỜI:
-- Tiếng Việt, ngắn gọn, dễ hiểu với nông dân
-- Dựa vào data thực tế khi tư vấn
-- Đề xuất hành động cụ thể
-- Tối đa 150 từ mỗi câu trả lời`;
+NGUYÊN TẮC:
+- Ngắn gọn, dễ hiểu, thực tế.
+- Đề xuất hành động cụ thể.
+- Tối đa 150 từ.`;
 
-    // Bước 3 — Gọi Gemini API với retry + fallback model
-    const primaryModel = this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.5-flash';
-    const fallbackModel = 'gemini-2.5-pro';
-    const modelsToTry = [primaryModel, fallbackModel];
+    // Bước 3 — Gọi Gemini API (chỉ dùng model primary)
+    const modelName = this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.5-flash';
 
     let reply = '';
-    let lastError: any;
+    
+    try {
+      const model = this.genAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction: systemPrompt,
+      });
 
-    for (const modelName of modelsToTry) {
-      try {
-        const model = this.genAI.getGenerativeModel({
-          model: modelName,
-          systemInstruction: systemPrompt,
-        });
+      const chatSession = model.startChat({
+        history: history.map((msg) => ({
+          role: msg.role === ChatRole.USER ? 'user' : 'model',
+          parts: [{ text: msg.content }],
+        })),
+      });
 
-        const chatSession = model.startChat({
-          history: history.map((msg) => ({
-            role: msg.role === ChatRole.USER ? 'user' : 'model',
-            parts: [{ text: msg.content }],
-          })),
-        });
-
-        const result = await chatSession.sendMessage(message);
-        reply = result.response.text();
-        break; // Thành công — thoát vòng lặp
-      } catch (err: any) {
-        lastError = err;
-        console.error(`[FarmAI] Error with model ${modelName}:`, err?.message || err);
-        const is503 = err?.status === 503 || err?.statusText === 'Service Unavailable'
-          || String(err?.message || '').includes('503');
-        const is429 = err?.status === 429 || err?.statusText === 'Too Many Requests'
-          || String(err?.message || '').includes('429')
-          || String(err?.message || '').includes('exceeded your current quota');
-
-        if (!is503 && !is429) throw err; // Lỗi khác thì throw luôn
-        // 503 hoặc 429 → thử model tiếp theo
-      }
-    }
-
-    if (!reply) {
-      console.error('[FarmAI] All models failed. Last error:', lastError?.message || lastError);
+      const result = await chatSession.sendMessage(message);
+      reply = result.response.text();
+    } catch (err: any) {
+      console.error(`[FarmAI] Error with model ${modelName}:`, err?.message || err);
       // Bị lỗi quá tải / giới hạn API
       return {
-        reply: 'Xin lỗi, trợ lý AI đang bị quá tải giới hạn sử dụng (API Quota Limit). Vui lòng đợi và thử lại sau khoảng 1 phút.',
+        reply: 'Xin lỗi, trợ lý AI đang bị quá tải hoặc tạm ngưng kết nối. Vui lòng đợi trong giây lát rồi thử lại.',
         contextUsed,
       };
-
     }
 
     // Bước 4 — Lưu vào farm_ai_chats
@@ -203,6 +194,9 @@ NGUYÊN TẮC TRẢ LỜI:
     await this.farmAiChatRepository.save(assistantMessageEntity);
 
     return { reply, contextUsed };
+    } finally {
+      this.activeRequests.delete(requestKey);
+    }
   }
 
   async getChatHistory(userId: number, barnId: number, limit: number = 20) {
