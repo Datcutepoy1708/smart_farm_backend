@@ -22,12 +22,13 @@ export class NotesService {
   /** POST /notes — tạo ghi chú mới */
   async create(userId: number, dto: CreateNoteDto): Promise<Note> {
     const note = new Note();
-    note.userId = userId;
-    note.title = dto.title || null;
-    note.content = dto.content;
-    note.tag = dto.tag || NoteTag.ROUTINE;
-    note.barnId = dto.barnId ?? null;
-    note.flockId = dto.flockId ?? null;
+    note.userId   = userId;
+    note.title    = dto.title || null;
+    note.content  = dto.content;
+    note.tag      = dto.tag || NoteTag.ROUTINE;
+    note.barnId   = dto.barnId ?? null;
+    note.flockId  = dto.flockId ?? null;
+    note.reminderAt = dto.reminderAt ? new Date(dto.reminderAt) : null;
     return this.noteRepo.save(note);
   }
 
@@ -39,7 +40,15 @@ export class NotesService {
   ): Promise<Note> {
     const note = await this.noteRepo.findOne({ where: { id, userId } });
     if (!note) throw new NotFoundException(`Note #${id} không tồn tại`);
-    Object.assign(note, dto);
+
+    if (dto.title     !== undefined) note.title    = dto.title || null;
+    if (dto.content   !== undefined) note.content  = dto.content;
+    if (dto.tag       !== undefined) note.tag      = dto.tag as NoteTag;
+    if (dto.barnId    !== undefined) note.barnId   = dto.barnId ?? null;
+    if (dto.flockId   !== undefined) note.flockId  = dto.flockId ?? null;
+    if (dto.reminderAt !== undefined)
+      note.reminderAt = dto.reminderAt ? new Date(dto.reminderAt) : null;
+
     return this.noteRepo.save(note);
   }
 

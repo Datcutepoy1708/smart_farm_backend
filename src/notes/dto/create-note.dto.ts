@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsNumber, IsDateString } from 'class-validator';
 import { NoteTag } from '../entities/note.entity';
 
 export class CreateNoteDto {
@@ -20,4 +20,8 @@ export class CreateNoteDto {
   @IsOptional()
   @IsNumber()
   flockId?: number;
+
+  @IsOptional()
+  @IsDateString()
+  reminderAt?: string | null;
 }
