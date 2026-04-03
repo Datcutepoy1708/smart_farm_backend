@@ -30,6 +30,14 @@ export interface AlertPayload {
   createdAt: Date;
 }
 
+export interface YoloUpdateData {
+  barnId: number;
+  chickenCount: number;
+  isAbnormal: boolean;
+  confidenceAvg: number | null;
+  recordedAt: string;
+}
+
 @WebSocketGateway({
   cors: {
     origin: '*',
@@ -76,7 +84,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * Emit real-time farm overview update tới room farm_{userId}
    * Gọi từ MqttService sau khi lưu environment_log
    */
-  emitFarmOverviewUpdate(userId: number, data: FarmOverviewUpdateData) {
+  emitFarmOverviewUpdate(userId: number, data: FarmOverviewUpdateData): void {
     const room = `farm_${userId}`;
     this.server.to(room).emit('farm:overview:update', data);
     this.logger.debug(
@@ -87,11 +95,23 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   /**
    * Emit alert mới tới room farm_{userId}
    */
-  emitNewAlert(userId: number, alert: AlertPayload) {
+  emitNewAlert(userId: number, alert: AlertPayload): void {
     const room = `farm_${userId}`;
     this.server.to(room).emit('alert:new', alert);
     this.logger.debug(
       `🔔 Emitted alert:new to ${room}: [${alert.severity}] ${alert.message}`,
+    );
+  }
+
+  /**
+   * Emit kết quả YOLO detection mới tới room farm_{userId}
+   * Gọi từ CameraService sau khi lưu yolo_detection_log
+   */
+  emitYoloUpdate(userId: number, data: YoloUpdateData): void {
+    const room = `farm_${userId}`;
+    this.server.to(room).emit('yolo:update', data);
+    this.logger.debug(
+      `🐔 Emitted yolo:update to ${room}: Barn${data.barnId} | ${data.chickenCount} chickens | abnormal=${data.isAbnormal}`,
     );
   }
 }
