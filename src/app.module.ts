@@ -20,6 +20,7 @@ import { AlertsModule } from './alerts/alerts.module';
 import { NotesModule } from './notes/notes.module';
 import { FarmAiModule } from './farm-ai/farm-ai.module';
 import { MqttModule } from './mqtt/mqtt.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 // Gateway
 import { EventsGateway } from './gateway/events.gateway';
@@ -42,6 +43,7 @@ import { Alert } from './alerts/entities/alert.entity';
 import { Note } from './notes/entities/note.entity';
 import { FarmAiChat } from './farm-ai/entities/farm-ai-chat.entity';
 import { YoloDetectionLog } from './farm-ai/entities/yolo-detection-log.entity';
+import { PushToken } from './notifications/entities/push-token.entity';
 
 @Module({
   imports: [
@@ -78,6 +80,7 @@ import { YoloDetectionLog } from './farm-ai/entities/yolo-detection-log.entity';
             Note,
             FarmAiChat,
             YoloDetectionLog,
+            PushToken,
           ],
           synchronize: false,
         };
@@ -131,6 +134,7 @@ import { YoloDetectionLog } from './farm-ai/entities/yolo-detection-log.entity';
     NotesModule,
     FarmAiModule,
     MqttModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService, EventsGateway],
