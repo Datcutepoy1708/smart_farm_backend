@@ -15,6 +15,7 @@ export enum DeviceType {
   FAN = 'fan',
   HEATER = 'heater',
   WASHER = 'washer',
+  DOOR = 'door',
 }
 
 export enum DeviceStatus {

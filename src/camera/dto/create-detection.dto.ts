@@ -12,6 +12,10 @@ export class CreateDetectionDto {
   @IsNotEmpty()
   barnId: number;
 
+  @IsOptional()
+  @IsNumber()
+  flockId?: number;
+
   @IsNumber()
   @IsNotEmpty()
   chickenCount: number;

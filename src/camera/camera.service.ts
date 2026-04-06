@@ -181,6 +181,7 @@ export class CameraService {
   ): Promise<YoloDetectionLog> {
     const detection = this.detectionRepository.create({
       barnId: dto.barnId,
+      flockId: dto.flockId ?? null,
       chickenCount: dto.chickenCount,
       abnormalCount: dto.abnormalCount ?? 0,
       behaviors: dto.behaviors ?? null,
@@ -201,8 +202,16 @@ export class CameraService {
       );
     }
 
-    // Emit real-time YOLO update qua Socket.IO → room farm_1
-    this.eventsGateway.emitYoloUpdate(1, {
+    // Load barn để lấy đúng userId cho socket room
+    const barn = await this.detectionRepository.manager.findOne(
+      'Barn',
+      { where: { id: dto.barnId } } as any,
+    ) as { userId: number } | null;
+
+    const userId = barn?.userId ?? 1;
+
+    // Emit real-time YOLO update qua Socket.IO → room farm_{userId}
+    this.eventsGateway.emitYoloUpdate(userId, {
       barnId: saved.barnId,
       chickenCount: saved.chickenCount,
       isAbnormal: saved.isAbnormal,
