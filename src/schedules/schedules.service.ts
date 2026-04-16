@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 
 import { Schedule } from './entities/schedule.entity';
 import {
@@ -19,10 +19,20 @@ import { Flock, FlockStatus } from '../flocks/entities/flock.entity';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { MqttService } from '../mqtt/mqtt.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class SchedulesService {
   private readonly logger = new Logger(SchedulesService.name);
+
+  /**
+   * Set deduplication: mỗi schedule chỉ trigger 1 lần / phút.
+   * Key format: "{scheduleId}-{YYYYMMDD}-{HH}{MM}"
+   */
+  private readonly triggeredKeys = new Set<string>();
+
+  /** Topic prefix từ env (vd: smartfarm_datcutepoy_2026) */
+  private readonly topicPrefix: string;
 
   constructor(
     @InjectRepository(Schedule)
@@ -36,7 +46,12 @@ export class SchedulesService {
     @InjectRepository(Flock)
     private readonly flockRepo: Repository<Flock>,
     private readonly mqttService: MqttService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.topicPrefix =
+      this.configService.get<string>('MQTT_TOPIC_PREFIX') ||
+      'smartfarm_datcutepoy_2026';
+  }
 
   async getSchedules(barnId: number): Promise<Schedule[]> {
     return this.scheduleRepo.find({
@@ -70,14 +85,12 @@ export class SchedulesService {
     const schedule = this.scheduleRepo.create(dto);
     const saved = await this.scheduleRepo.save(schedule);
 
-    // Return with device relation
     return this.getScheduleById(saved.id);
   }
 
   async updateSchedule(id: number, dto: UpdateScheduleDto): Promise<Schedule> {
     const schedule = await this.getScheduleById(id);
 
-    // Check if device is valid if it's being updated
     if (dto.deviceId && dto.deviceId !== schedule.deviceId) {
       const device = await this.deviceRepo.findOne({
         where: { id: dto.deviceId },
@@ -98,9 +111,26 @@ export class SchedulesService {
     await this.scheduleRepo.remove(schedule);
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  /**
+   * Cron chạy mỗi 10 giây để check lịch hẹn.
+   * Độ chính xác: trong vòng 10 giây của phút đặt lịch.
+   * Dedup bằng Set key → mỗi schedule chỉ trigger TỐI ĐA 1 lần/phút.
+   */
+  @Cron('*/10 * * * * *')
   async runScheduledJobs() {
-    this.logger.debug('Running scheduled jobs check...');
+    const now = new Date();
+
+    const hh = now.getHours().toString().padStart(2, '0');
+    const mm = now.getMinutes().toString().padStart(2, '0');
+    const currentTime = `${hh}:${mm}`;
+
+    // Ngày trong tuần: JS 0=CN → map 1=T2,...,6=T7,7=CN
+    const jsDay = now.getDay();
+    const currentDayOfWeek = jsDay === 0 ? 7 : jsDay;
+
+    // Dedup key prefix cho phút này
+    const dateStr = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}`;
+    const minuteKey = `${dateStr}-${hh}${mm}`;
 
     const activeSchedules = await this.scheduleRepo.find({
       where: { isActive: true },
@@ -109,33 +139,29 @@ export class SchedulesService {
 
     if (activeSchedules.length === 0) return;
 
-    // Lấy timestamp hiện tại
-    const now = new Date();
-
-    // Lấy giờ phút format HH:MM theo giờ local (VN)
-    // Dùng padStart để đảm bảo 2 chữ số (VD: 09:05 instead of 9:5)
-    const hours = now.getHours().toString().padStart(2, '0');
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    const currentTime = `${hours}:${minutes}`;
-
-    // JS Date.getDay() trả về 0-CN, 1-T2, ..., 6-T7.
-    // Map về chuẩn: 1=T2, 2=T3, ..., 6=T7, 7=CN
-    const jsDay = now.getDay();
-    const currentDayOfWeek = jsDay === 0 ? 7 : jsDay;
-
     for (const schedule of activeSchedules) {
-      // 1. Check time and day
+      const dedupKey = `${schedule.id}-${minuteKey}`;
+
       if (
         schedule.scheduledTime === currentTime &&
-        schedule.daysOfWeek.includes(currentDayOfWeek)
+        schedule.daysOfWeek.includes(currentDayOfWeek) &&
+        !this.triggeredKeys.has(dedupKey)
       ) {
+        // Đánh dấu đã trigger trong phút này
+        this.triggeredKeys.add(dedupKey);
         this.triggerSchedule(schedule, now);
       }
+    }
+
+    // Cleanup Set nếu quá lớn (tránh memory leak khi chạy lâu dài)
+    if (this.triggeredKeys.size > 2000) {
+      this.triggeredKeys.clear();
+      this.logger.debug('🧹 Đã cleanup dedup keys');
     }
   }
 
   private async triggerSchedule(schedule: Schedule, timestamp: Date) {
-    const { device, barnId, name, durationSeconds } = schedule;
+    const { device, barnId, name } = schedule;
 
     if (!device || !device.isActive) {
       this.logger.warn(
@@ -144,88 +170,104 @@ export class SchedulesService {
       return;
     }
 
-    this.logger.log(`⏰ Schedule [${name}] triggered: ${device.name} ON`);
+    const controlTopic = `${this.topicPrefix}/barn${barnId}/control`;
 
-    // 1. MQTT Publish ON
-    const payloadOn = {
-      device_id: device.id,
-      action: DeviceAction.ON,
-      timestamp: timestamp.toISOString(),
-      ...(schedule.feedAmountGram
-        ? { amount_gram: schedule.feedAmountGram }
-        : {}),
-    };
-
-    const controlTopic = `farm/barn${barnId}/control`;
-    this.mqttService.publish(controlTopic, JSON.stringify(payloadOn));
-
-    // 2. Update Device Status
-    device.currentStatus = DeviceStatus.ON;
-    await this.deviceRepo.save(device);
-
-    // 3. Log to device_logs
-    const deviceLogOn = this.deviceLogRepo.create({
-      barnId,
-      deviceId: device.id,
-      action: DeviceAction.ON,
-      triggeredBy: TriggerType.SCHEDULE,
-    });
-    await this.deviceLogRepo.save(deviceLogOn);
-
-    // 4. If feeder, log feed_logs
-    if (device.deviceType === DeviceType.FEEDER && schedule.feedAmountGram) {
-      const activeFlock = await this.flockRepo.findOne({
-        where: { barnId, status: FlockStatus.ACTIVE },
-      });
-
-      if (activeFlock) {
-        const feedLog = this.feedLogRepo.create({
-          barnId,
-          flockId: activeFlock.id,
-          deviceId: device.id,
-          amountGram: schedule.feedAmountGram,
-          triggeredBy: TriggerType.SCHEDULE,
-          scheduleId: schedule.id,
-        });
-        await this.feedLogRepo.save(feedLog);
-      } else {
+    // ── Feeder: gửi lệnh FEED theo khối lượng ──────────────────────────────
+    if (device.deviceType === DeviceType.FEEDER) {
+      if (!schedule.feedAmountGram || schedule.feedAmountGram <= 0) {
         this.logger.warn(
-          `⚠ Feeder triggered for barn ${barnId} but no ACTIVE flock found. Skipped creating feed_logs.`,
+          `⏳ Schedule [${name}] skipped: feedAmountGram chưa được đặt.`,
         );
+        return;
       }
-    }
 
-    // 5. Schedule OFF timeout
-    setTimeout(async () => {
       this.logger.log(
-        `⏰ Schedule [${name}]: ${device.name} OFF after ${durationSeconds}s`,
+        `⏰ Schedule [${name}] triggered: Feeder ${device.name} → ${schedule.feedAmountGram}g`,
       );
 
-      // Publish OFF
-      const payloadOff = {
+      // Gửi MQTT lệnh cho ăn theo khối lượng
+      const payload = {
         device_id: device.id,
-        action: DeviceAction.OFF,
-        timestamp: new Date().toISOString(),
+        action: 'FEED',
+        target_gram: schedule.feedAmountGram,
+        schedule_id: schedule.id,
+        barn_id: barnId,
+        timestamp: timestamp.toISOString(),
       };
-      this.mqttService.publish(controlTopic, JSON.stringify(payloadOff));
+      this.mqttService.publish(controlTopic, JSON.stringify(payload));
 
-      // Update Device Status
-      const freshDevice = await this.deviceRepo.findOne({
-        where: { id: device.id },
-      });
-      if (freshDevice) {
-        freshDevice.currentStatus = DeviceStatus.OFF;
-        await this.deviceRepo.save(freshDevice);
-      }
+      // Cập nhật trạng thái device = đang hoạt động
+      device.currentStatus = DeviceStatus.ON;
+      await this.deviceRepo.save(device);
 
-      // Log Device OFF
-      const deviceLogOff = this.deviceLogRepo.create({
+      // Log device_logs: FEED trigger
+      const deviceLog = this.deviceLogRepo.create({
         barnId,
         deviceId: device.id,
-        action: DeviceAction.OFF,
+        action: DeviceAction.ON,
         triggeredBy: TriggerType.SCHEDULE,
       });
-      await this.deviceLogRepo.save(deviceLogOff);
-    }, durationSeconds * 1000);
+      await this.deviceLogRepo.save(deviceLog);
+
+      // Kết quả thực tế (actual_gram) sẽ được nhận qua MQTT feed_result từ ESP32
+      // và xử lý trong MqttService.handleFeedResult()
+      this.logger.log(
+        `📤 Đã gửi lệnh FEED ${schedule.feedAmountGram}g tới ${controlTopic}`,
+      );
+    } else {
+      // ── Các thiết bị khác (fan, heater, ...): vẫn ON/OFF theo thời gian ──
+      this.logger.log(
+        `⏰ Schedule [${name}] triggered: ${device.name} ON`,
+      );
+
+      const payloadOn = {
+        device_id: device.id,
+        action: DeviceAction.ON,
+        timestamp: timestamp.toISOString(),
+      };
+      this.mqttService.publish(controlTopic, JSON.stringify(payloadOn));
+
+      device.currentStatus = DeviceStatus.ON;
+      await this.deviceRepo.save(device);
+
+      const deviceLogOn = this.deviceLogRepo.create({
+        barnId,
+        deviceId: device.id,
+        action: DeviceAction.ON,
+        triggeredBy: TriggerType.SCHEDULE,
+      });
+      await this.deviceLogRepo.save(deviceLogOn);
+
+      // Giữ logic setTimeout OFF cho thiết bị không phải feeder
+      const durationSeconds = schedule.durationSeconds || 30;
+      setTimeout(async () => {
+        this.logger.log(
+          `⏰ Schedule [${name}]: ${device.name} OFF after ${durationSeconds}s`,
+        );
+
+        const payloadOff = {
+          device_id: device.id,
+          action: DeviceAction.OFF,
+          timestamp: new Date().toISOString(),
+        };
+        this.mqttService.publish(controlTopic, JSON.stringify(payloadOff));
+
+        const freshDevice = await this.deviceRepo.findOne({
+          where: { id: device.id },
+        });
+        if (freshDevice) {
+          freshDevice.currentStatus = DeviceStatus.OFF;
+          await this.deviceRepo.save(freshDevice);
+        }
+
+        const deviceLogOff = this.deviceLogRepo.create({
+          barnId,
+          deviceId: device.id,
+          action: DeviceAction.OFF,
+          triggeredBy: TriggerType.SCHEDULE,
+        });
+        await this.deviceLogRepo.save(deviceLogOff);
+      }, durationSeconds * 1000);
+    }
   }
 }

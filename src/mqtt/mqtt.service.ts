@@ -11,12 +11,13 @@ import * as mqtt from 'mqtt';
 
 import { EnvironmentLog } from '../environment/entities/environment-log.entity';
 import { Barn } from '../barns/entities/barn.entity';
+import { BarnDevice, DeviceStatus } from '../devices/entities/barn-device.entity';
+import { FeedLog } from '../feed/entities/feed-log.entity';
+import { Flock, FlockStatus } from '../flocks/entities/flock.entity';
+import { DeviceLog, TriggerType, DeviceAction } from '../devices/entities/device-log.entity';
 import { EventsGateway } from '../gateway/events.gateway';
 import { AlertsService } from '../alerts/alerts.service';
-
-// API sẽ kết nối sau:
-// GET  /api/barns/:barnId/environment  → lấy dữ liệu sensor
-// POST /api/devices/:deviceId/command  → gửi lệnh xuống ESP32
+import { NotificationsService } from '../notifications/notifications.service';
 
 interface SensorPayload {
   barn_id: number;
@@ -29,6 +30,16 @@ interface AlertPayload {
   barn_id: number;
   type: string;
   message: string;
+}
+
+/** Payload ESP32 gửi về sau khi hoàn tất đổ thức ăn và cân */
+interface FeedResultPayload {
+  device_id: number;
+  target_gram: number;   // Khối lượng mục tiêu
+  actual_gram: number;   // Khối lượng thực tế cân được
+  status: 'ok' | 'insufficient' | 'error';
+  schedule_id?: number;
+  barn_id?: number;
 }
 
 @Injectable()
@@ -47,7 +58,20 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     @InjectRepository(Barn)
     private barnRepository: Repository<Barn>,
 
+    @InjectRepository(BarnDevice)
+    private deviceRepository: Repository<BarnDevice>,
+
+    @InjectRepository(FeedLog)
+    private feedLogRepository: Repository<FeedLog>,
+
+    @InjectRepository(Flock)
+    private flockRepository: Repository<Flock>,
+
+    @InjectRepository(DeviceLog)
+    private deviceLogRepository: Repository<DeviceLog>,
+
     private alertsService: AlertsService,
+    private notificationsService: NotificationsService,
   ) {
     this.topicPrefix =
       this.configService.get<string>('MQTT_TOPIC_PREFIX') ||
@@ -77,7 +101,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     this.client.on('connect', () => {
       this.logger.log('✅ Đã kết nối MQTT broker thành công!');
 
-      // Subscribe các topics
+      // Subscribe topic sensors
       this.client?.subscribe(`${this.topicPrefix}/+/sensors`, (err) => {
         if (err) {
           this.logger.error('❌ Lỗi subscribe farm/+/sensors:', err.message);
@@ -86,11 +110,21 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
         }
       });
 
+      // Subscribe topic alert từ ESP32
       this.client?.subscribe(`${this.topicPrefix}/+/alert`, (err) => {
         if (err) {
           this.logger.error('❌ Lỗi subscribe farm/+/alert:', err.message);
         } else {
           this.logger.log('📡 Subscribed: farm/+/alert');
+        }
+      });
+
+      // Subscribe topic feed_result: ESP32 báo kết quả cân sau khi đổ thức ăn
+      this.client?.subscribe(`${this.topicPrefix}/+/feed_result`, (err) => {
+        if (err) {
+          this.logger.error('❌ Lỗi subscribe farm/+/feed_result:', err.message);
+        } else {
+          this.logger.log('📡 Subscribed: farm/+/feed_result');
         }
       });
     });
@@ -100,6 +134,8 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
       if (topic.includes('/sensors')) {
         this.handleSensorData(topic, payload);
+      } else if (topic.includes('/feed_result')) {
+        this.handleFeedResult(topic, payload);
       } else if (topic.includes('/alert')) {
         this.handleAlertData(topic, payload);
       }
@@ -120,26 +156,23 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Xử lý dữ liệu sensor từ ESP32
-   * Topic format: farm/barn{id}/sensors
+   * Topic format: {prefix}/barn{id}/sensors
    * Payload: { barn_id, temperature, humidity, water_level }
    */
   private async handleSensorData(topic: string, payload: string) {
     try {
-      // Parse topic lấy barnId: "farm/barn1/sensors" → barnId = 1
       const topicParts = topic.split('/');
-      const barnSegment = topicParts[1]; // "barn1"
+      const barnSegment = topicParts[1];
       const barnIdFromTopic = parseInt(barnSegment.replace(/\D/g, ''), 10);
 
       const data: any = JSON.parse(payload);
-      const barnId = data.barn_id || barnIdFromTopic || 1; // Default fallback to 1
+      const barnId = data.barn_id || barnIdFromTopic || 1;
 
-      // Translate Greenhouse deep object payloads to standard flat schema
       if (data.environment && typeof data.environment === 'object') {
         data.temperature = data.environment.temp_c;
         data.humidity = data.environment.humidity_pct;
       }
 
-      // Ensure numbers are valid
       const temp = Number(data.temperature);
       const hum = Number(data.humidity);
 
@@ -156,7 +189,6 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
           (data.water_level !== undefined ? ` | 💧 ${data.water_level}%` : ''),
       );
 
-      // Kiểm tra ngưỡng cảnh báo
       if (data.temperature > 35) {
         this.logger.warn('🔴 CẢNH BÁO: Nhiệt độ cao!');
         await this.alertsService.createAlert(
@@ -188,7 +220,6 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
         );
       }
 
-      // Lưu vào environment_logs
       const log = this.environmentLogRepository.create({
         barnId,
         temperature: data.temperature,
@@ -199,8 +230,6 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       await this.environmentLogRepository.save(log);
       this.logger.debug(`💾 Đã lưu environment log cho Barn${barnId}`);
 
-      // Emit real-time update qua Socket.IO
-      // TODO: userId hardcode = 1, sau cải thiện lấy từ barn.userId
       this.eventsGateway.emitFarmOverviewUpdate(1, {
         barnId,
         temperature: data.temperature,
@@ -214,8 +243,120 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Xử lý kết quả cân sau khi ESP32 đổ thức ăn
+   * Topic format: {prefix}/barn{id}/feed_result
+   * Payload: { device_id, target_gram, actual_gram, status, schedule_id?, barn_id? }
+   */
+  private async handleFeedResult(topic: string, payload: string) {
+    try {
+      const data: FeedResultPayload = JSON.parse(payload);
+
+      // Parse barnId từ topic: "prefix/barn1/feed_result" → 1
+      const topicParts = topic.split('/');
+      const barnSegment = topicParts[1]; // "barn1"
+      const barnIdFromTopic = parseInt(barnSegment.replace(/\D/g, ''), 10);
+      const barnId = data.barn_id || barnIdFromTopic || 1;
+
+      this.logger.log(
+        `🍗 FeedResult Barn${barnId}: target=${data.target_gram}g | actual=${data.actual_gram}g | status=${data.status}`,
+      );
+
+      // 1. Lấy flock đang hoạt động
+      const flock = await this.flockRepository.findOne({
+        where: { barnId, status: FlockStatus.ACTIVE },
+      });
+
+      // 2. Lưu FeedLog với actual_gram thực tế từ cân
+      if (flock) {
+        const feedLog = this.feedLogRepository.create({
+          barnId,
+          flockId: flock.id,
+          deviceId: data.device_id,
+          amountGram: data.actual_gram,       // Khối lượng thực tế cân được
+          triggeredBy: TriggerType.SCHEDULE,
+          scheduleId: data.schedule_id || undefined,
+        });
+        await this.feedLogRepository.save(feedLog);
+        this.logger.log(`💾 Đã lưu FeedLog: ${data.actual_gram}g cho Barn${barnId}`);
+      } else {
+        this.logger.warn(
+          `⚠️ Không tìm thấy flock active cho Barn${barnId}, bỏ qua lưu FeedLog`,
+        );
+      }
+
+      // 3. Cập nhật trạng thái thiết bị → OFF (đã xong)
+      const device = await this.deviceRepository.findOne({
+        where: { id: data.device_id },
+      });
+      if (device) {
+        device.currentStatus = DeviceStatus.OFF;
+        await this.deviceRepository.save(device);
+
+        // Log device_logs: OFF
+        const deviceLog = this.deviceLogRepository.create({
+          barnId,
+          deviceId: device.id,
+          action: DeviceAction.OFF,
+          triggeredBy: TriggerType.SCHEDULE,
+        });
+        await this.deviceLogRepository.save(deviceLog);
+      }
+
+      // 4. Nếu thiếu hụt → tạo Alert + Push Notification
+      if (data.status === 'insufficient' || data.status === 'error') {
+        const shortage = data.target_gram - data.actual_gram;
+        const shortPct = ((shortage / data.target_gram) * 100).toFixed(1);
+
+        const alertMsg =
+          `⚠️ Cho ăn không đủ khối lượng! ` +
+          `Mục tiêu: ${data.target_gram}g | Thực tế: ${data.actual_gram}g | Thiếu: ${shortage}g (${shortPct}%)`;
+
+        await this.alertsService.createAlert(
+          barnId,
+          'feed_insufficient',
+          'warning',
+          alertMsg,
+          {
+            target_gram: data.target_gram,
+            actual_gram: data.actual_gram,
+            shortage_gram: shortage,
+            schedule_id: data.schedule_id,
+          },
+        );
+
+        // Gửi Push Notification về điện thoại
+        const barn = await this.barnRepository.findOne({ where: { id: barnId } });
+        const userId = barn?.userId || 1;
+
+        await this.notificationsService.sendNotification(
+          userId,
+          '🐔 Cảnh báo cho ăn',
+          `Chuồng ${barnId}: Thiếu ${shortage}g thức ăn (${data.actual_gram}/${data.target_gram}g)`,
+          {
+            barnId,
+            type: 'feed_insufficient',
+            target_gram: data.target_gram,
+            actual_gram: data.actual_gram,
+          },
+        );
+
+        this.logger.warn(
+          `🚨 Feed insufficient Barn${barnId}: thiếu ${shortage}g → Đã gửi alert + push notification`,
+        );
+      } else {
+        this.logger.log(
+          `✅ Cho ăn đủ khối lượng Barn${barnId}: ${data.actual_gram}g`,
+        );
+      }
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`❌ Lỗi xử lý feed_result: ${errMsg}`);
+    }
+  }
+
+  /**
    * Xử lý cảnh báo từ ESP32
-   * Topic format: farm/barn{id}/alert
+   * Topic format: {prefix}/barn{id}/alert
    */
   private handleAlertData(topic: string, payload: string) {
     try {
@@ -232,7 +373,6 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Gửi lệnh xuống ESP32 qua MQTT
-   * Ví dụ: publish('farm/barn1/control', '{"device":"fan","action":"on"}')
    */
   publish(topic: string, payload: string) {
     if (!this.client || !this.client.connected) {

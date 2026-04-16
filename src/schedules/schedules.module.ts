@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
 import { SchedulesService } from './schedules.service';
 import { SchedulesController } from './schedules.controller';
 
@@ -13,6 +14,7 @@ import { MqttModule } from '../mqtt/mqtt.module';
 
 @Module({
   imports: [
+    ConfigModule,
     TypeOrmModule.forFeature([Schedule, BarnDevice, DeviceLog, FeedLog, Flock]),
     MqttModule,
   ],
@@ -21,3 +23,4 @@ import { MqttModule } from '../mqtt/mqtt.module';
   exports: [SchedulesService],
 })
 export class SchedulesModule {}
+

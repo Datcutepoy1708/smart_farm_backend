@@ -27,6 +27,7 @@ export enum AlertType {
   DEVICE_ERROR = 'device_error',
   NOT_EATING = 'not_eating',
   FEED_EMPTY = 'feed_empty',
+  FEED_INSUFFICIENT = 'feed_insufficient', // Cho ăn không đủ khối lượng mục tiêu
   LOW_WATER = 'low_water',
 }
 

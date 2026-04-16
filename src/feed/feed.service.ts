@@ -10,12 +10,14 @@ import { Repository, Between } from 'typeorm';
 import { FeedCalculation } from './entities/feed-calculation.entity';
 import { FeedLog } from './entities/feed-log.entity';
 import { NutritionStandard } from './entities/nutrition-standard.entity';
+import { WeightLog } from './entities/weight-log.entity';
 import {
   Flock,
   FlockStatus,
   FlockStage,
 } from '../flocks/entities/flock.entity';
 import { EnvironmentLog } from '../environment/entities/environment-log.entity';
+import { RecordWeightDto } from './dto/record-weight.dto';
 
 @Injectable()
 export class FeedService {
@@ -28,6 +30,8 @@ export class FeedService {
     private readonly feedLogRepo: Repository<FeedLog>,
     @InjectRepository(NutritionStandard)
     private readonly nutritionStandardRepo: Repository<NutritionStandard>,
+    @InjectRepository(WeightLog)
+    private readonly weightLogRepo: Repository<WeightLog>,
     @InjectRepository(Flock)
     private readonly flockRepo: Repository<Flock>,
     @InjectRepository(EnvironmentLog)
@@ -92,7 +96,7 @@ export class FeedService {
     const baseFeedGram = avgWeightKg * feedRatio * currentCount * 1000;
     const recommendedFeedGram = baseFeedGram * tempFactor;
 
-    const waterRatio = Number(standard.waterRatio || 2.0); // Fallback to 2.0 if missing
+    const waterRatio = Number(standard.waterRatio || 2.0);
     const recommendedWaterLiter = currentCount * waterRatio;
 
     // 8. Save FeedCalculation
@@ -113,7 +117,6 @@ export class FeedService {
 
     const saved = await this.feedCalcRepo.save(calculation);
 
-    // Attach relations so caller has access to full standard details
     saved.standard = standard;
 
     return saved;
@@ -172,7 +175,6 @@ export class FeedService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // 1. Fetch latest calculation to mock/interpolate historical recommendations if missing
     const latestCalc = await this.feedCalcRepo.findOne({
       where: { barnId },
       order: { calculatedAt: 'DESC' },
@@ -200,7 +202,7 @@ export class FeedService {
 
       const calcOnDate = await this.feedCalcRepo.findOne({
         where: { barnId, calculatedAt: Between(targetDate, nextDate) },
-        order: { calculatedAt: 'DESC' }, // Last calc of that day
+        order: { calculatedAt: 'DESC' },
       });
 
       const recommendedGram = calcOnDate
@@ -209,7 +211,6 @@ export class FeedService {
       const percentage =
         recommendedGram > 0 ? (consumedGram / recommendedGram) * 100 : 0;
 
-      // format exactly as YYYY-MM-DD
       const dateStr = targetDate.toISOString().split('T')[0];
 
       history.push({
@@ -221,5 +222,62 @@ export class FeedService {
     }
 
     return history;
+  }
+
+  /**
+   * Ghi cân nặng mẫu vào weight_logs
+   * Tính avg_weight_kg = totalWeightKg / sampleCount
+   * Cập nhật flock.avgWeightKg để phép tính feed dùng cân nặng thực tế
+   */
+  async recordWeight(barnId: number, dto: RecordWeightDto): Promise<WeightLog> {
+    if (dto.totalWeightKg <= 0 || dto.sampleCount <= 0) {
+      throw new BadRequestException(
+        'totalWeightKg và sampleCount phải lớn hơn 0',
+      );
+    }
+
+    const avgWeightKg = dto.totalWeightKg / dto.sampleCount;
+
+    // Lấy flock đang hoạt động
+    const flock = await this.flockRepo.findOne({
+      where: { barnId, status: FlockStatus.ACTIVE },
+    });
+
+    // Lưu WeightLog
+    const log = this.weightLogRepo.create({
+      barnId,
+      flockId: flock?.id || null,
+      totalWeightKg: dto.totalWeightKg,
+      sampleCount: dto.sampleCount,
+      avgWeightKg,
+      ageDays: dto.ageDays ?? flock?.currentAgeDays ?? null,
+    });
+
+    const savedLog = await this.weightLogRepo.save(log);
+    this.logger.log(
+      `⚖️ Đã lưu weight log Barn${barnId}: avg=${avgWeightKg.toFixed(3)}kg (${dto.sampleCount} con mẫu)`,
+    );
+
+    // Cập nhật avgWeightKg của flock để phép tính feed phản ánh cân nặng thực
+    if (flock) {
+      flock.avgWeightKg = avgWeightKg;
+      await this.flockRepo.save(flock);
+      this.logger.log(
+        `🔄 Đã cập nhật flock ${flock.id} avgWeightKg = ${avgWeightKg.toFixed(3)}kg`,
+      );
+    }
+
+    return savedLog;
+  }
+
+  /**
+   * Lấy lịch sử cân nặng mẫu của barn
+   */
+  async getWeightLogs(barnId: number, limit = 10): Promise<WeightLog[]> {
+    return this.weightLogRepo.find({
+      where: { barnId },
+      order: { recordedAt: 'DESC' },
+      take: limit,
+    });
   }
 }
