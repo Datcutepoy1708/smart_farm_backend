@@ -48,12 +48,29 @@ export class DevicesService {
     device.currentStatus = action;
     await this.barnDeviceRepository.save(device);
 
+    // Map deviceType DB -> ten lenh ESP32
+    const deviceCommandMap: Record<string, string> = {
+      fan:      'FAN',
+      heater:   'HEATER',
+      light:    'LIGHT',
+      door:     'DOOR',
+      water:    'PUMP',      // ESP32 dung ten 'PUMP'
+      feeder:   'FEED',      // ESP32 dung ten 'FEED'
+      conveyor: 'CONVEYOR',
+      buzzer:   'BUZZER',
+    };
+    const espDevice = deviceCommandMap[device.deviceType] || device.deviceType.toUpperCase();
+
+    // FIX: Publish len topic control chung -- ESP32 subscribe va xu ly theo field 'device'
+    // Format: {"device": "FAN", "action": "ON"}
+    const controlTopic = `${this.topicPrefix}/barn${device.barnId}/control`;
     const payload = JSON.stringify({
-      device_id: deviceId,
+      device: espDevice,
       action,
+      device_id: deviceId,
       timestamp: new Date().toISOString(),
     });
-    this.mqttService.publish(device.mqttTopic, payload);
+    this.mqttService.publish(controlTopic, payload);
 
     const log = this.deviceLogRepository.create({
       barnId: device.barnId,
