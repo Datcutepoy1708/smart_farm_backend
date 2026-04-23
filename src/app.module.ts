@@ -141,6 +141,6 @@ import { PushToken } from './notifications/entities/push-token.entity';
     CameraModule,
   ],
   controllers: [AppController],
-  providers: [AppService, EventsGateway],
+  providers: [AppService],
 })
 export class AppModule {}
