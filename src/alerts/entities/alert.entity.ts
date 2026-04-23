@@ -29,6 +29,8 @@ export enum AlertType {
   FEED_EMPTY = 'feed_empty',
   FEED_INSUFFICIENT = 'feed_insufficient', // Cho ăn không đủ khối lượng mục tiêu
   LOW_WATER = 'low_water',
+  FIRE = 'fire',                           // Cảnh báo cháy (Flame sensor)
+  TOXIC_GAS = 'toxic_gas',                 // Cảnh báo khí độc (MQ-2)
 }
 
 @Entity('alerts')

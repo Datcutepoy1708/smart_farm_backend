@@ -355,19 +355,88 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Xử lý cảnh báo từ ESP32
+   * Xử lý cảnh báo khẩn cấp từ ESP32
    * Topic format: {prefix}/barn{id}/alert
+   * Payload: { barn_id, type: 'fire' | 'toxic_gas' | ..., message, value? }
    */
-  private handleAlertData(topic: string, payload: string) {
+  private async handleAlertData(topic: string, payload: string) {
     try {
-      this.logger.warn(`🚨 Alert từ barn: ${payload}`);
+      const data: AlertPayload & { value?: number } = JSON.parse(payload);
 
-      const data: AlertPayload = JSON.parse(payload);
+      // Parse barnId từ topic nếu payload không có
+      const topicParts = topic.split('/');
+      const barnSegment = topicParts[1];
+      const barnIdFromTopic = parseInt(barnSegment.replace(/\D/g, ''), 10);
+      const barnId = data.barn_id || barnIdFromTopic || 1;
+
       this.logger.warn(
-        `🚨 Alert Barn${data.barn_id}: [${data.type}] ${data.message}`,
+        `🚨 Alert Barn${barnId}: [${data.type}] ${data.message}`,
       );
-    } catch {
-      this.logger.warn(`🚨 Alert raw: ${payload}`);
+
+      // ── Xác định nội dung cảnh báo theo loại ──────────────────────────────
+      let alertType = 'sensor_offline'; // fallback
+      let severity = 'warning';
+      let title = '⚠️ Cảnh báo hệ thống';
+      let message = data.message || 'Phát hiện bất thường tại chuồng nuôi';
+
+      switch (data.type) {
+        case 'fire':
+          alertType = 'fire';
+          severity = 'critical';
+          title = '🔥 CẢNH BÁO CHÁY KHẨN CẤP';
+          message = data.message || `Phát hiện lửa/nhiệt độ cực cao tại Chuồng ${barnId}! Cửa thoát hiểm đã tự động mở.`;
+          break;
+
+        case 'toxic_gas':
+          alertType = 'toxic_gas';
+          severity = 'critical';
+          title = '☠️ CẢNH BÁO KHÍ ĐỘC';
+          message = data.message || `Phát hiện khí độc/khói tại Chuồng ${barnId}! Cần xử lý ngay lập tức.`;
+          break;
+
+        default:
+          alertType = data.type || 'sensor_offline';
+          severity = 'warning';
+          title = '⚠️ Cảnh báo';
+          message = data.message || `Cảnh báo không xác định tại Chuồng ${barnId}`;
+      }
+
+      // ── Lưu Alert vào Database ────────────────────────────────────────────
+      await this.alertsService.createAlert(
+        barnId,
+        alertType,
+        severity,
+        message,
+        {
+          type: data.type,
+          value: data.value,
+          source: 'esp32_hardware_interrupt',
+          timestamp: new Date().toISOString(),
+        },
+      );
+
+      // ── Gửi Push Notification khẩn cấp về điện thoại ─────────────────────
+      const barn = await this.barnRepository.findOne({ where: { id: barnId } });
+      const userId = barn?.userId || 1;
+
+      await this.notificationsService.sendNotification(
+        userId,
+        title,
+        `Chuồng ${barnId}: ${message}`,
+        {
+          barnId,
+          type: alertType,
+          severity,
+          value: data.value,
+        },
+      );
+
+      this.logger.warn(
+        `🚨 [${severity.toUpperCase()}] Barn${barnId} - ${alertType}: Đã lưu alert + gửi push notification`,
+      );
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`❌ Lỗi xử lý alert data: ${errMsg} | Payload: ${payload}`);
     }
   }
 
