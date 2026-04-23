@@ -63,7 +63,8 @@ export class DevicesService {
 
     // FIX: Publish len topic control chung -- ESP32 subscribe va xu ly theo field 'device'
     // Format: {"device": "FAN", "action": "ON"}
-    const controlTopic = `${this.topicPrefix}/barn${device.barnId}/control`;
+    const TOPIC_PREFIX = 'smartfarm_datcutepoy_2026';
+    const controlTopic = `${TOPIC_PREFIX}/barn${device.barnId}/control`;
     const payload = JSON.stringify({
       device: espDevice,
       action,
