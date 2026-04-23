@@ -458,6 +458,17 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  /**
+   * Gửi lệnh điều khiển ESP32 qua MQTT control topic
+   * Topic: {prefix}/barn{barnId}/control
+   */
+  publishControl(barnId: number, device: string, params: Record<string, unknown> = {}) {
+    const topic = `${this.topicPrefix}/barn${barnId}/control`;
+    const payload = JSON.stringify({ device, ...params });
+    this.publish(topic, payload);
+    this.logger.log(`🎮 Control Barn${barnId}: ${device} → ${JSON.stringify(params)}`);
+  }
+
   onModuleDestroy() {
     if (this.client) {
       this.client.end(true);

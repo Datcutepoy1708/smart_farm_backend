@@ -11,11 +11,15 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { BarnsService } from './barns.service';
+import { MqttService } from '../mqtt/mqtt.service';
 
 @Controller('barns')
 @UseGuards(AuthGuard('jwt'))
 export class BarnsController {
-  constructor(private readonly barnsService: BarnsService) {}
+  constructor(
+    private readonly barnsService: BarnsService,
+    private readonly mqttService: MqttService,
+  ) { }
 
   /** GET /api/barns/overview */
   @Get('overview')
@@ -54,5 +58,45 @@ export class BarnsController {
     @Request() req: any,
   ) {
     return this.barnsService.update(id, req.user.userId, body);
+  }
+
+  /**
+   * POST /api/barns/:barnId/scale-calibration
+   * Body: { factor?: number, knownWeightKg?: number }
+   * - factor: Đặt hệ số scale trực tiếp
+   * - knownWeightKg: Khởi động auto-calibration với vật nặng đã biết
+   */
+  @Post(':barnId/scale-calibration')
+  async setScaleCalibration(
+    @Param('barnId', ParseIntPipe) barnId: number,
+    @Body() body: { factor?: number; knownWeightKg?: number },
+  ) {
+    if (body.knownWeightKg !== undefined && body.knownWeightKg > 0) {
+      // Auto-calibration: ESP32 tự tính toán khi có vật nặng trên cân
+      this.mqttService.publishControl(barnId, 'CALIBRATE_SCALE', {
+        knownWeightKg: body.knownWeightKg,
+      });
+      return {
+        success: true,
+        message: `Đã gửi lệnh auto-calibration với vật nặng ${body.knownWeightKg}kg về Chuồng ${barnId}`,
+        barnId,
+        knownWeightKg: body.knownWeightKg,
+      };
+    }
+
+    if (body.factor !== undefined && body.factor > 0) {
+      // Đặt hệ số scale trực tiếp
+      this.mqttService.publishControl(barnId, 'SET_SCALE', {
+        factor: body.factor,
+      });
+      return {
+        success: true,
+        message: `Đã cập nhật hệ số cân thành ${body.factor} cho Chuồng ${barnId}`,
+        barnId,
+        factor: body.factor,
+      };
+    }
+
+    return { success: false, message: 'Cần truyền factor hoặc knownWeightKg' };
   }
 }
