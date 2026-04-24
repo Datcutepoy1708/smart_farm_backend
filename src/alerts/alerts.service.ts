@@ -4,6 +4,23 @@ import { Repository } from 'typeorm';
 import { Alert, AlertSeverity, AlertType } from './entities/alert.entity';
 import { EventsGateway } from '../gateway/events.gateway';
 import { Barn } from '../barns/entities/barn.entity';
+import { NotificationsService } from '../notifications/notifications.service';
+
+// Các loại cảnh báo nguy hiểm sẽ được gửi push notification
+const CRITICAL_ALERT_TYPES: AlertType[] = [
+  AlertType.FIRE,
+  AlertType.TOXIC_GAS,
+  AlertType.HIGH_TEMP,
+];
+
+// Icon tương ứng cho từng loại cảnh báo
+const ALERT_ICON: Record<string, string> = {
+  [AlertType.FIRE]:      '🔥',
+  [AlertType.TOXIC_GAS]: '☠️',
+  [AlertType.HIGH_TEMP]: '🌡️',
+  [AlertType.LOW_WATER]: '💧',
+  [AlertType.FEED_EMPTY]:'🍗',
+};
 
 @Injectable()
 export class AlertsService {
@@ -15,6 +32,7 @@ export class AlertsService {
     @InjectRepository(Barn)
     private barnRepository: Repository<Barn>,
     private eventsGateway: EventsGateway,
+    private notificationsService: NotificationsService,
   ) {}
 
   async getAlerts(barnId: number, limit = 20): Promise<Alert[]> {
@@ -68,20 +86,38 @@ export class AlertsService {
 
     const savedAlert = await this.alertRepository.save(alert);
 
-    // Find barn user to emit to the correct room
+    // Lấy thông tin barn và userId
     const barn = await this.barnRepository.findOne({ where: { id: barnId } });
-    // Assuming barn has user_id, if not we will emit to userId=1 (like in MQTT temporarily)
     const userId = barn?.userId || 1;
 
-    // Emit 'alert:new' via Socket.IO
+    // Emit 'alert:new' via Socket.IO (badge tự cập nhật trên app)
     this.eventsGateway.emitNewAlert(userId, {
-      id: Number(savedAlert.id),
-      barnId: savedAlert.barnId,
+      id:        Number(savedAlert.id),
+      barnId:    savedAlert.barnId,
       alertType: savedAlert.alertType,
-      severity: savedAlert.severity,
-      message: savedAlert.message,
+      severity:  savedAlert.severity,
+      message:   savedAlert.message,
       createdAt: savedAlert.createdAt,
     });
+
+    // ─── Gửi Push Notification cho các cảnh báo nguy hiểm ──────────────────
+    if (CRITICAL_ALERT_TYPES.includes(alertType as AlertType)) {
+      const icon  = ALERT_ICON[alertType] ?? '🚨';
+      const title = `${icon} Cảnh báo khẩn cấp - ${barn?.name ?? `Chuồng ${barnId}`}`;
+
+      this.notificationsService
+        .sendNotification(userId, title, message, {
+          alertId:   Number(savedAlert.id),
+          alertType: savedAlert.alertType,
+          severity:  savedAlert.severity,
+          barnId,
+        })
+        .catch((err) =>
+          this.logger.error(`Lỗi gửi push notification: ${err.message}`),
+        );
+
+      this.logger.warn(`📱 Push sent for [${alertType}] → userId=${userId}`);
+    }
 
     this.logger.log(
       `Created alert for Barn${barnId}: [${severity}] ${message}`,

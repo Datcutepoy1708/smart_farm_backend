@@ -5,9 +5,14 @@ import { AlertsController } from './alerts.controller';
 import { Alert } from './entities/alert.entity';
 import { Barn } from '../barns/entities/barn.entity';
 import { GatewayModule } from '../gateway/gateway.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Alert, Barn]), GatewayModule],
+  imports: [
+    TypeOrmModule.forFeature([Alert, Barn]),
+    GatewayModule,
+    NotificationsModule,
+  ],
   providers: [AlertsService],
   controllers: [AlertsController],
   exports: [AlertsService],
