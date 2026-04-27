@@ -187,12 +187,13 @@ export class SchedulesService {
 
       // Gửi MQTT lệnh cho ăn theo khối lượng
       const payload = {
-        device_id: device.id,
-        action: 'FEED',
+        device_id:   device.id,
+        device_type: device.deviceType.toUpperCase(), // 'FEEDER', 'WASHER', 'FAN'...
+        action:      'FEED',
         target_gram: schedule.feedAmountGram,
         schedule_id: schedule.id,
-        barn_id: barnId,
-        timestamp: timestamp.toISOString(),
+        barn_id:     barnId,
+        timestamp:   timestamp.toISOString(),
       };
       this.mqttService.publish(controlTopic, JSON.stringify(payload));
 
@@ -220,10 +221,15 @@ export class SchedulesService {
         `⏰ Schedule [${name}] triggered: ${device.name} ON`,
       );
 
+      // Khai bao TRUOC khi dung trong payloadOn
+      const durationSeconds = schedule.durationSeconds || 30;
+
       const payloadOn = {
-        device_id: device.id,
-        action: DeviceAction.ON,
-        timestamp: timestamp.toISOString(),
+        device_id:      device.id,
+        device_type:    device.deviceType.toUpperCase(),
+        action:         DeviceAction.ON,
+        duration_sec:   durationSeconds,
+        timestamp:      timestamp.toISOString(),
       };
       this.mqttService.publish(controlTopic, JSON.stringify(payloadOn));
 
@@ -239,16 +245,16 @@ export class SchedulesService {
       await this.deviceLogRepo.save(deviceLogOn);
 
       // Giữ logic setTimeout OFF cho thiết bị không phải feeder
-      const durationSeconds = schedule.durationSeconds || 30;
       setTimeout(async () => {
         this.logger.log(
           `⏰ Schedule [${name}]: ${device.name} OFF after ${durationSeconds}s`,
         );
 
         const payloadOff = {
-          device_id: device.id,
-          action: DeviceAction.OFF,
-          timestamp: new Date().toISOString(),
+          device_id:   device.id,
+          device_type: device.deviceType.toUpperCase(),
+          action:      DeviceAction.OFF,
+          timestamp:   new Date().toISOString(),
         };
         this.mqttService.publish(controlTopic, JSON.stringify(payloadOff));
 
