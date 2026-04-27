@@ -120,16 +120,20 @@ export class SchedulesService {
   async runScheduledJobs() {
     const now = new Date();
 
-    const hh = now.getHours().toString().padStart(2, '0');
-    const mm = now.getMinutes().toString().padStart(2, '0');
+    // Su dung mui gio Viet Nam (UTC+7) tren Railway
+    const vnTimeStr = now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const vnTime = new Date(vnTimeStr);
+
+    const hh = vnTime.getHours().toString().padStart(2, '0');
+    const mm = vnTime.getMinutes().toString().padStart(2, '0');
     const currentTime = `${hh}:${mm}`;
 
     // Ngày trong tuần: JS 0=CN → map 1=T2,...,6=T7,7=CN
-    const jsDay = now.getDay();
+    const jsDay = vnTime.getDay();
     const currentDayOfWeek = jsDay === 0 ? 7 : jsDay;
 
     // Dedup key prefix cho phút này
-    const dateStr = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}`;
+    const dateStr = `${vnTime.getFullYear()}${(vnTime.getMonth() + 1).toString().padStart(2, '0')}${vnTime.getDate().toString().padStart(2, '0')}`;
     const minuteKey = `${dateStr}-${hh}${mm}`;
 
     const activeSchedules = await this.scheduleRepo.find({
