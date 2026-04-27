@@ -9,7 +9,7 @@ export class CreateDeviceDto {
   @IsNotEmpty()
   name: string;
 
-  @IsIn(['feeder', 'water', 'fan', 'heater', 'washer'])
+  @IsIn(['feeder', 'water', 'fan', 'heater', 'washer', 'light', 'door', 'conveyor'])
   @IsNotEmpty()
   deviceType: string;
 }

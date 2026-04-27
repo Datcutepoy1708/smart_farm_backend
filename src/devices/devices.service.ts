@@ -37,7 +37,7 @@ export class DevicesService {
     return device;
   }
 
-  async controlDevice(deviceId: number, action: string, userId: number) {
+  async controlDevice(deviceId: number, action: string, userId: number, amount?: number, duration?: number) {
     const device = await this.barnDeviceRepository.findOne({
       where: { id: deviceId },
     });
@@ -57,6 +57,7 @@ export class DevicesService {
       water:    'PUMP',      // ESP32 dung ten 'PUMP'
       feeder:   'FEED',      // ESP32 dung ten 'FEED'
       conveyor: 'CONVEYOR',
+      washer:   'WASHER',
       buzzer:   'BUZZER',
     };
     const espDevice = deviceCommandMap[device.deviceType] || device.deviceType.toUpperCase();
@@ -65,12 +66,19 @@ export class DevicesService {
     // Format: {"device": "FAN", "action": "ON"}
     const TOPIC_PREFIX = 'smartfarm_datcutepoy_2026';
     const controlTopic = `${TOPIC_PREFIX}/barn${device.barnId}/control`;
-    const payload = JSON.stringify({
+    const payloadObj: any = {
       device: espDevice,
       action,
       device_id: deviceId,
       timestamp: new Date().toISOString(),
-    });
+    };
+    if (amount) {
+      payloadObj.target_gram = amount * 1000; // convert kg to gram
+    }
+    if (duration) {
+      payloadObj.duration_sec = duration;
+    }
+    const payload = JSON.stringify(payloadObj);
     this.mqttService.publish(controlTopic, payload);
 
     const log = this.deviceLogRepository.create({

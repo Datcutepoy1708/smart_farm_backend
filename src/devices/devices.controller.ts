@@ -55,6 +55,8 @@ export class DevicesController {
       id,
       dto.action,
       user.userId,
+      dto.amount,
+      dto.duration,
     );
     return { success: true, data };
   }
