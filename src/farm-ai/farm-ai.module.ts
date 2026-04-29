@@ -10,6 +10,7 @@ import { EnvironmentLog } from '../environment/entities/environment-log.entity';
 import { FeedCalculation } from '../feed/entities/feed-calculation.entity';
 import { FeedLog } from '../feed/entities/feed-log.entity';
 import { Alert } from '../alerts/entities/alert.entity';
+import { FeedProduct } from '../feed/entities/feed-product.entity';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { Alert } from '../alerts/entities/alert.entity';
       FeedCalculation,
       FeedLog,
       Alert,
+      FeedProduct,
     ]),
   ],
   providers: [FarmAiService],

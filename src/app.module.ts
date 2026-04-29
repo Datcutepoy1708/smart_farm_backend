@@ -46,6 +46,7 @@ import { FarmAiChat } from './farm-ai/entities/farm-ai-chat.entity';
 import { YoloDetectionLog } from './farm-ai/entities/yolo-detection-log.entity';
 import { YoloDetectionLog as CameraYoloDetectionLog } from './camera/entities/yolo-detection-log.entity';
 import { PushToken } from './notifications/entities/push-token.entity';
+import { FeedProduct } from './feed/entities/feed-product.entity';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { PushToken } from './notifications/entities/push-token.entity';
             YoloDetectionLog,
             CameraYoloDetectionLog,
             PushToken,
+            FeedProduct,
           ],
           synchronize: false,
         };

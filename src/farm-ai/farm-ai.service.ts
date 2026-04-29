@@ -12,6 +12,7 @@ import { FeedCalculation } from '../feed/entities/feed-calculation.entity';
 import { Alert } from '../alerts/entities/alert.entity';
 import { ChatDto } from './dto/chat.dto';
 import { FeedLog } from '../feed/entities/feed-log.entity';
+import { FeedProduct } from '../feed/entities/feed-product.entity';
 
 @Injectable()
 export class FarmAiService {
@@ -34,6 +35,8 @@ export class FarmAiService {
     private feedLogRepository: Repository<FeedLog>,
     @InjectRepository(Alert)
     private alertRepository: Repository<Alert>,
+    @InjectRepository(FeedProduct)
+    private feedProductRepository: Repository<FeedProduct>,
   ) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     if (!apiKey) {
@@ -207,5 +210,87 @@ NGUYÊN TẮC:
     });
 
     return history.reverse();
+  }
+
+  async analyzeFeedPackaging(barnId: number, base64Image: string) {
+    const barn = await this.barnRepository.findOne({ where: { id: barnId } });
+    if (!barn) {
+      throw new InternalServerErrorException('Barn not found');
+    }
+
+    const flock = await this.flockRepository.findOne({
+      where: { barnId: barnId },
+      order: { createdAt: 'DESC' },
+    });
+
+    const ageDays = flock?.currentAgeDays ?? 0;
+    const avgWeightKg = flock?.avgWeightKg ?? 0;
+    const stage = flock?.currentStage ?? 'Unknown';
+
+    const systemPrompt = `Bạn là chuyên gia dinh dưỡng gia cầm. Dưới đây là thông tin đàn gà:
+Tuổi: ${ageDays} ngày
+Cân nặng TB: ${avgWeightKg}kg
+Giai đoạn: ${stage}
+
+Hãy phân tích hình ảnh bao bì cám được cung cấp, trích xuất thành phần (Protein, Năng lượng, v.v.). 
+Dựa trên thành phần cám đó và thông tin đàn gà, hãy tính toán và đề xuất lượng thức ăn (gram) cho một con gà một ngày.
+Nếu không tìm thấy Năng lượng trao đổi, hãy ước tính dựa trên Protein và các thành phần khác.
+
+TRẢ VỀ KẾT QUẢ DƯỚI DẠNG ĐÚNG MỘT OBJECT JSON THEO ĐÚNG ĐỊNH DẠNG SAU, KHÔNG CÓ MARKDOWN BỌC NGOÀI, KHÔNG CÓ TEXT KHÁC:
+{
+  "name_suggestion": "Tên loại cám bạn đề xuất",
+  "protein_pct": 21.5,
+  "energy_kcal": 3100,
+  "calcium_pct": 1.2,
+  "fiber_pct": 4.5,
+  "recommendedGramPerChicken": 120,
+  "explanation": "Lời giải thích ngắn gọn tại sao lại đề xuất lượng ăn này"
+}`;
+
+    const modelName = this.configService.get<string>('GEMINI_MODEL') || 'gemini-1.5-flash';
+    const model = this.genAI.getGenerativeModel({ model: modelName });
+
+    const promptPart = { text: systemPrompt };
+    const imagePart = {
+      inlineData: {
+        data: base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, ''),
+        mimeType: 'image/jpeg',
+      },
+    };
+
+    try {
+      const result = await model.generateContent([promptPart, imagePart]);
+      const responseText = result.response.text().trim();
+      let jsonStr = responseText;
+      if (jsonStr.startsWith('\`\`\`json')) {
+        jsonStr = jsonStr.replace(/^\`\`\`json/, '').replace(/\`\`\`$/, '').trim();
+      } else if (jsonStr.startsWith('\`\`\`')) {
+        jsonStr = jsonStr.replace(/^\`\`\`/, '').replace(/\`\`\`$/, '').trim();
+      }
+
+      const parsedData = JSON.parse(jsonStr);
+
+      // Create new inactive feed product
+      const newProduct = this.feedProductRepository.create({
+        barnId,
+        name: parsedData.name_suggestion || 'Cám mới quét AI',
+        proteinPct: parsedData.protein_pct || 0,
+        energyKcalPerKg: parsedData.energy_kcal || 0,
+        calciumPct: parsedData.calcium_pct || 0,
+        fiberPct: parsedData.fiber_pct || 0,
+        isActive: false,
+        rawAiAnalysis: parsedData,
+      });
+
+      const savedProduct = await this.feedProductRepository.save(newProduct);
+
+      return {
+        id: savedProduct.id,
+        analysis: parsedData,
+      };
+    } catch (err: any) {
+      console.error('[FarmAI] Analyze Feed Error:', err);
+      throw new InternalServerErrorException('Không thể phân tích ảnh. Vui lòng thử lại.');
+    }
   }
 }

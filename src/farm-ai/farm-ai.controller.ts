@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { FarmAiService } from './farm-ai.service';
 import { ChatDto } from './dto/chat.dto';
+import { AnalyzeFeedDto } from './dto/analyze-feed.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -51,6 +52,19 @@ export class FarmAiController {
     return {
       success: true,
       data: history,
+    };
+  }
+
+  @Post('analyze-feed')
+  async analyzeFeedPackaging(@Body() dto: AnalyzeFeedDto) {
+    const result = await this.farmAiService.analyzeFeedPackaging(
+      dto.barnId,
+      dto.image,
+    );
+
+    return {
+      success: true,
+      data: result,
     };
   }
 }

@@ -10,6 +10,7 @@ import { WeightLog } from './entities/weight-log.entity';
 import { Barn } from '../barns/entities/barn.entity';
 import { Flock } from '../flocks/entities/flock.entity';
 import { EnvironmentLog } from '../environment/entities/environment-log.entity';
+import { FeedProduct } from './entities/feed-product.entity';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { EnvironmentLog } from '../environment/entities/environment-log.entity';
       Barn,
       Flock,
       EnvironmentLog,
+      FeedProduct,
     ]),
   ],
   providers: [FeedService],

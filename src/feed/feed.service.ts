@@ -18,6 +18,7 @@ import {
 } from '../flocks/entities/flock.entity';
 import { EnvironmentLog } from '../environment/entities/environment-log.entity';
 import { RecordWeightDto } from './dto/record-weight.dto';
+import { FeedProduct } from './entities/feed-product.entity';
 
 @Injectable()
 export class FeedService {
@@ -36,6 +37,8 @@ export class FeedService {
     private readonly flockRepo: Repository<Flock>,
     @InjectRepository(EnvironmentLog)
     private readonly environmentLogRepo: Repository<EnvironmentLog>,
+    @InjectRepository(FeedProduct)
+    private readonly feedProductRepo: Repository<FeedProduct>,
   ) {}
 
   async calculateFeed(barnId: number): Promise<FeedCalculation> {
@@ -91,9 +94,26 @@ export class FeedService {
     else if (temp > 28 && temp <= 32) tempFactor = 0.95;
     else if (temp > 32) tempFactor = 0.9;
 
-    // 7. Calculate Recommend Feed & Water
+    // 7. Check for Active FeedProduct to override Energy (Kcal) and Protein
+    const activeFeed = await this.feedProductRepo.findOne({
+      where: { barnId, isActive: true },
+    });
+
+    // We calculate required calories per bird per day based on the standard energy & standard feed ratio
+    // If standard says feedRatio is 0.22 (e.g. 220g for 1kg bird) and standard energy is 3100 Kcal/kg
+    // That means the bird needs: 0.22 * 1kg * 3100 Kcal/kg = 682 Kcal/day
+    // If our actual feed has 3300 Kcal/kg, then to get 682 Kcal, the bird only needs: 682 / 3300 = 0.206 kg = 206g
+    const stdEnergy = Number(standard.energyKcalPerKg);
     const feedRatio = Number(standard.feedRatio);
-    const baseFeedGram = avgWeightKg * feedRatio * currentCount * 1000;
+    let baseFeedGram = avgWeightKg * feedRatio * currentCount * 1000;
+
+    if (activeFeed && activeFeed.energyKcalPerKg > 0) {
+      const actualEnergy = Number(activeFeed.energyKcalPerKg);
+      // Adjust baseFeedGram based on energy ratio
+      baseFeedGram = baseFeedGram * (stdEnergy / actualEnergy);
+      this.logger.log(`Using active feed product: ${activeFeed.name} with ${actualEnergy} Kcal/kg. Adjusted base feed.`);
+    }
+
     const recommendedFeedGram = baseFeedGram * tempFactor;
 
     const waterRatio = Number(standard.waterRatio || 2.0);
@@ -278,6 +298,39 @@ export class FeedService {
       where: { barnId },
       order: { recordedAt: 'DESC' },
       take: limit,
+    });
+  }
+
+  async applyFeedProduct(barnId: number, productId: number) {
+    const product = await this.feedProductRepo.findOne({
+      where: { id: productId, barnId },
+    });
+
+    if (!product) {
+      throw new NotFoundException(`Feed product ${productId} not found for barn ${barnId}`);
+    }
+
+    // Deactivate all others
+    await this.feedProductRepo.update(
+      { barnId },
+      { isActive: false },
+    );
+
+    // Activate the new one
+    product.isActive = true;
+    await this.feedProductRepo.save(product);
+
+    this.logger.log(`Applied feed product ${product.name} as active for barn ${barnId}`);
+
+    // Recalculate feed with the new energy ratio immediately
+    await this.calculateFeed(barnId);
+
+    return { success: true, message: 'Applied feed product successfully' };
+  }
+
+  async getActiveFeedProduct(barnId: number) {
+    return this.feedProductRepo.findOne({
+      where: { barnId, isActive: true },
     });
   }
 }

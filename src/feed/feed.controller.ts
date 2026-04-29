@@ -57,4 +57,21 @@ export class FeedController {
   ) {
     return this.feedService.getWeightLogs(barnId, limit);
   }
+
+  @Post('products/:productId/apply')
+  async applyFeedProduct(
+    @Param('barnId', ParseIntPipe) barnId: number,
+    @Param('productId', ParseIntPipe) productId: number,
+  ) {
+    return this.feedService.applyFeedProduct(barnId, productId);
+  }
+
+  @Get('products/active')
+  async getActiveFeedProduct(@Param('barnId', ParseIntPipe) barnId: number) {
+    const product = await this.feedService.getActiveFeedProduct(barnId);
+    return {
+      success: true,
+      data: product || null,
+    };
+  }
 }
