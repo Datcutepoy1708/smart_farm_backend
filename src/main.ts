@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
+import { json, urlencoded } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 
@@ -14,6 +15,10 @@ async function bootstrap() {
 
   // Enable CORS
   app.enableCors();
+
+  // Increase payload limit for base64 images
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ extended: true, limit: '50mb' }));
 
   // Validation Pipe
   app.useGlobalPipes(
