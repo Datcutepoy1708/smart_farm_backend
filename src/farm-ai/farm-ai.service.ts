@@ -256,8 +256,10 @@ TRẢ VỀ KẾT QUẢ DƯỚI DẠNG ĐÚNG MỘT OBJECT JSON THEO ĐÚNG ĐỊ
 }`;
 
     const modelName = this.configService.get<string>('GEMINI_MODEL') || 'gemini-1.5-flash';
-    const model = this.genAI.getGenerativeModel({ 
-      model: modelName,
+    const fallbackModelName = 'gemini-1.5-flash';
+
+    const getModel = (name: string) => this.genAI.getGenerativeModel({ 
+      model: name,
       generationConfig: { responseMimeType: 'application/json' }
     });
 
@@ -269,8 +271,19 @@ TRẢ VỀ KẾT QUẢ DƯỚI DẠNG ĐÚNG MỘT OBJECT JSON THEO ĐÚNG ĐỊ
       },
     };
 
+    let result;
     try {
-      const result = await model.generateContent([promptPart, imagePart]);
+      result = await getModel(modelName).generateContent([promptPart, imagePart]);
+    } catch (primaryErr: any) {
+      if (primaryErr?.status === 503 && modelName !== fallbackModelName) {
+        console.warn(`[FarmAI] Primary model ${modelName} unavailable (503), falling back to ${fallbackModelName}`);
+        result = await getModel(fallbackModelName).generateContent([promptPart, imagePart]);
+      } else {
+        throw primaryErr;
+      }
+    }
+
+    try {
       const responseText = result.response.text().trim();
       let jsonStr = responseText;
       if (jsonStr.startsWith('\`\`\`json')) {
@@ -328,7 +341,9 @@ TRẢ VỀ KẾT QUẢ DƯỚI DẠNG ĐÚNG MỘT OBJECT JSON THEO ĐÚNG ĐỊ
         analysis: parsedData,
       };
     } catch (err: any) {
-      console.error('[FarmAI] Analyze Feed Error:', err);
+      console.error('[FarmAI] Analyze Feed Error Type:', err?.constructor?.name);
+      console.error('[FarmAI] Analyze Feed Error Message:', err?.message);
+      console.error('[FarmAI] Analyze Feed Error Stack:', err?.stack?.substring(0, 500));
       throw new InternalServerErrorException('Không thể phân tích ảnh. Vui lòng thử lại.');
     }
   }
