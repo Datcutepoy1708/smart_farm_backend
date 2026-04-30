@@ -307,7 +307,6 @@ TRẢ VỀ KẾT QUẢ DƯỚI DẠNG ĐÚNG MỘT OBJECT JSON THEO ĐÚNG ĐỊ
         fiberPct: parsedData.fiber_pct || 0,
         isActive: false,
         rawAiAnalysis: parsedData,
-        imageUrl: null, // Will update asynchronously
       });
       const savedProduct = await this.feedProductRepository.save(newProduct);
 
