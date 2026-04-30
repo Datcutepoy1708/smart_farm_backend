@@ -256,7 +256,10 @@ TRẢ VỀ KẾT QUẢ DƯỚI DẠNG ĐÚNG MỘT OBJECT JSON THEO ĐÚNG ĐỊ
 }`;
 
     const modelName = this.configService.get<string>('GEMINI_MODEL') || 'gemini-1.5-flash';
-    const model = this.genAI.getGenerativeModel({ model: modelName });
+    const model = this.genAI.getGenerativeModel({ 
+      model: modelName,
+      generationConfig: { responseMimeType: 'application/json' }
+    });
 
     const promptPart = { text: systemPrompt };
     const imagePart = {
@@ -276,21 +279,25 @@ TRẢ VỀ KẾT QUẢ DƯỚI DẠNG ĐÚNG MỘT OBJECT JSON THEO ĐÚNG ĐỊ
         jsonStr = jsonStr.replace(/^\`\`\`/, '').replace(/\`\`\`$/, '').trim();
       }
 
-      const parsedData = JSON.parse(jsonStr);
-
-      // Upload image to Cloudinary
-      let imageUrl: string | null = null;
+      let parsedData;
       try {
-        const uploadResult = await cloudinary.uploader.upload(base64Image, {
-          folder: 'smart_farm_feeds',
-        });
-        imageUrl = uploadResult.secure_url;
-      } catch (uploadErr) {
-        console.error('[Cloudinary] Upload Error:', uploadErr);
-        // Continue even if image upload fails
+        parsedData = JSON.parse(jsonStr);
+      } catch (parseErr) {
+        console.error('[FarmAI] JSON Parse Error. Raw response:', responseText);
+        // Fallback: try to extract JSON object using regex
+        const match = responseText.match(/\{[\s\S]*\}/);
+        if (match) {
+          try {
+            parsedData = JSON.parse(match[0]);
+          } catch (e) {
+            throw new Error('AI returned invalid JSON format.');
+          }
+        } else {
+          throw new Error('AI returned invalid JSON format.');
+        }
       }
 
-      // Create new inactive feed product
+      // Create new inactive feed product first
       const newProduct = this.feedProductRepository.create({
         barnId,
         name: parsedData.name_suggestion || 'Cám mới quét AI',
@@ -300,13 +307,25 @@ TRẢ VỀ KẾT QUẢ DƯỚI DẠNG ĐÚNG MỘT OBJECT JSON THEO ĐÚNG ĐỊ
         fiberPct: parsedData.fiber_pct || 0,
         isActive: false,
         rawAiAnalysis: parsedData,
-        imageUrl: imageUrl || undefined,
+        imageUrl: null, // Will update asynchronously
       });
-
       const savedProduct = await this.feedProductRepository.save(newProduct);
 
+      // Upload image to Cloudinary in the background (fire and forget)
+      // This prevents the 10-second timeout on the frontend
+      const imageToUpload = base64Image.startsWith('data:') ? base64Image : `data:image/jpeg;base64,${base64Image}`;
+      cloudinary.uploader.upload(imageToUpload, {
+        folder: 'smart_farm_feeds',
+      }).then(async (uploadResult) => {
+        savedProduct.imageUrl = uploadResult.secure_url;
+        await this.feedProductRepository.save(savedProduct);
+        console.log('[Cloudinary] Background Upload Success:', uploadResult.secure_url);
+      }).catch(uploadErr => {
+        console.error('[Cloudinary] Background Upload Error:', uploadErr);
+      });
+
       return {
-        id: Array.isArray(savedProduct) ? savedProduct[0].id : savedProduct.id,
+        id: savedProduct.id,
         analysis: parsedData,
       };
     } catch (err: any) {
