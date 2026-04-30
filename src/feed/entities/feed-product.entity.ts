@@ -38,6 +38,9 @@ export class FeedProduct {
   @Column({ name: 'raw_ai_analysis', type: 'jsonb', nullable: true })
   rawAiAnalysis: any;
 
+  @Column({ name: 'image_url', type: 'varchar', length: 1000, nullable: true })
+  imageUrl: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

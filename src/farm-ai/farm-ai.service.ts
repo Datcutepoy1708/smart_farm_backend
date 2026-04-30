@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { v2 as cloudinary } from 'cloudinary';
 
 import { FarmAiChat, ChatRole } from './entities/farm-ai-chat.entity';
 import { Barn } from '../barns/entities/barn.entity';
@@ -43,6 +44,13 @@ export class FarmAiService {
       throw new InternalServerErrorException('GEMINI_API_KEY is not configured');
     }
     this.genAI = new GoogleGenerativeAI(apiKey);
+
+    // Configure Cloudinary
+    cloudinary.config({
+      cloud_name: this.configService.get<string>('CLOUDINARY_CLOUD_NAME'),
+      api_key: this.configService.get<string>('CLOUDINARY_API_KEY'),
+      api_secret: this.configService.get<string>('CLOUDINARY_API_SECRET'),
+    });
   }
 
   async chat(userId: number, dto: ChatDto) {
@@ -270,6 +278,18 @@ TRẢ VỀ KẾT QUẢ DƯỚI DẠNG ĐÚNG MỘT OBJECT JSON THEO ĐÚNG ĐỊ
 
       const parsedData = JSON.parse(jsonStr);
 
+      // Upload image to Cloudinary
+      let imageUrl: string | null = null;
+      try {
+        const uploadResult = await cloudinary.uploader.upload(base64Image, {
+          folder: 'smart_farm_feeds',
+        });
+        imageUrl = uploadResult.secure_url;
+      } catch (uploadErr) {
+        console.error('[Cloudinary] Upload Error:', uploadErr);
+        // Continue even if image upload fails
+      }
+
       // Create new inactive feed product
       const newProduct = this.feedProductRepository.create({
         barnId,
@@ -280,12 +300,13 @@ TRẢ VỀ KẾT QUẢ DƯỚI DẠNG ĐÚNG MỘT OBJECT JSON THEO ĐÚNG ĐỊ
         fiberPct: parsedData.fiber_pct || 0,
         isActive: false,
         rawAiAnalysis: parsedData,
+        imageUrl: imageUrl || undefined,
       });
 
       const savedProduct = await this.feedProductRepository.save(newProduct);
 
       return {
-        id: savedProduct.id,
+        id: Array.isArray(savedProduct) ? savedProduct[0].id : savedProduct.id,
         analysis: parsedData,
       };
     } catch (err: any) {
