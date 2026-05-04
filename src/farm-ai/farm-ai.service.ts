@@ -255,8 +255,8 @@ TRẢ VỀ KẾT QUẢ DƯỚI DẠNG ĐÚNG MỘT OBJECT JSON THEO ĐÚNG ĐỊ
   "explanation": "Lời giải thích ngắn gọn tại sao lại đề xuất lượng ăn này"
 }`;
 
-    const modelName = this.configService.get<string>('GEMINI_MODEL') || 'gemini-1.5-flash';
-    const fallbackModelName = 'gemini-1.5-flash';
+    const modelName = this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.5-flash';
+    const fallbackModelName = 'gemini-2.0-flash';
 
     const getModel = (name: string) => this.genAI.getGenerativeModel({ 
       model: name,
@@ -275,8 +275,9 @@ TRẢ VỀ KẾT QUẢ DƯỚI DẠNG ĐÚNG MỘT OBJECT JSON THEO ĐÚNG ĐỊ
     try {
       result = await getModel(modelName).generateContent([promptPart, imagePart]);
     } catch (primaryErr: any) {
-      if (primaryErr?.status === 503 && modelName !== fallbackModelName) {
-        console.warn(`[FarmAI] Primary model ${modelName} unavailable (503), falling back to ${fallbackModelName}`);
+      const shouldFallback = (primaryErr?.status === 503 || primaryErr?.status === 404) && modelName !== fallbackModelName;
+      if (shouldFallback) {
+        console.warn(`[FarmAI] Primary model ${modelName} unavailable (${primaryErr?.status}), falling back to ${fallbackModelName}`);
         result = await getModel(fallbackModelName).generateContent([promptPart, imagePart]);
       } else {
         throw primaryErr;
