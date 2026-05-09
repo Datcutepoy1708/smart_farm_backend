@@ -31,6 +31,7 @@ export enum AlertType {
   LOW_WATER = 'low_water',
   FIRE = 'fire',                           // Cảnh báo cháy (Flame sensor)
   TOXIC_GAS = 'toxic_gas',                 // Cảnh báo khí độc (MQ-2)
+  FLOCK_READY = 'flock_ready',             // Đàn gà đạt tuổi xuất chuồng
 }
 
 @Entity('alerts')
