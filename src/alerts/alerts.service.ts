@@ -11,6 +11,11 @@ const CRITICAL_ALERT_TYPES: AlertType[] = [
   AlertType.FIRE,
   AlertType.TOXIC_GAS,
   AlertType.HIGH_TEMP,
+  AlertType.FEED_EMPTY,
+  AlertType.FEED_INSUFFICIENT,
+  AlertType.LOW_WATER,
+  AlertType.DEVICE_ERROR,
+  AlertType.FLOCK_READY,
 ];
 
 // Icon tương ứng cho từng loại cảnh báo

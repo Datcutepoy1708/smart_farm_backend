@@ -62,6 +62,8 @@ export class NotificationsService {
         title,
         body,
         data,
+        priority: 'high' as const,
+        channelId: 'alerts',
       }));
 
     if (messages.length === 0) return;
