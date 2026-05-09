@@ -10,6 +10,13 @@ export class FlocksService {
     private readonly flockRepo: Repository<Flock>,
   ) {}
 
+  async getBarnFlocks(barnId: number): Promise<Flock[]> {
+    return this.flockRepo.find({
+      where: { barnId },
+      order: { id: 'DESC' },
+    });
+  }
+
   async completeFlock(id: number): Promise<Flock> {
     const flock = await this.flockRepo.findOne({ where: { id } });
     if (!flock) {
