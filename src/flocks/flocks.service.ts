@@ -5,6 +5,7 @@ import { Flock, FlockStatus, FlockStage } from './entities/flock.entity';
 import { Barn, BarnStatus } from '../barns/entities/barn.entity';
 import { CreateFlockDto } from './dto/create-flock.dto';
 import { MortalityDto } from './dto/mortality.dto';
+import { AddChickensDto } from './dto/add-chickens.dto';
 
 @Injectable()
 export class FlocksService {
@@ -73,6 +74,21 @@ export class FlocksService {
     activeFlock.deadCount += dto.deadCount;
     activeFlock.currentCount -= dto.deadCount;
     if (activeFlock.currentCount < 0) activeFlock.currentCount = 0;
+
+    return this.flockRepo.save(activeFlock);
+  }
+
+  async addChickens(barnId: number, dto: AddChickensDto): Promise<Flock> {
+    const activeFlock = await this.flockRepo.findOne({
+      where: { barnId, status: FlockStatus.ACTIVE },
+    });
+
+    if (!activeFlock) {
+      throw new NotFoundException(`No active flock found in Barn ${barnId}`);
+    }
+
+    activeFlock.currentCount += dto.addCount;
+    activeFlock.initialCount += dto.addCount; // Cập nhật cả tổng ban đầu để tỷ lệ sống sót chính xác
 
     return this.flockRepo.save(activeFlock);
   }
