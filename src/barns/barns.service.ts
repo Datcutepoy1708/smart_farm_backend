@@ -40,13 +40,19 @@ export class BarnsService {
           order: { recordedAt: 'DESC' },
         });
 
+        // Tự động sửa lỗi trạng thái nếu chuồng được đánh dấu là active nhưng không có lứa gà nào active
+        let realStatus = barn.status;
+        if (!activeFlock) {
+          realStatus = BarnStatus.EMPTY;
+        }
+
         return {
           id: barn.id,
           name: barn.name,
           chickenCount: activeFlock?.currentCount ?? 0,
           temperature: latestEnvLog?.temperature ?? null,
           humidity: latestEnvLog?.humidity ?? null,
-          status: barn.status,
+          status: realStatus,
         };
       }),
     );
