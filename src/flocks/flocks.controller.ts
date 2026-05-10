@@ -1,5 +1,7 @@
-import { Controller, Post, Get, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Post, Get, Param, ParseIntPipe, Body } from '@nestjs/common';
 import { FlocksService } from './flocks.service';
+import { CreateFlockDto } from './dto/create-flock.dto';
+import { MortalityDto } from './dto/mortality.dto';
 
 @Controller('flocks')
 export class FlocksController {
@@ -8,6 +10,19 @@ export class FlocksController {
   @Get('barn/:barnId')
   async getBarnFlocks(@Param('barnId', ParseIntPipe) barnId: number) {
     return this.flocksService.getBarnFlocks(barnId);
+  }
+
+  @Post()
+  async create(@Body() createFlockDto: CreateFlockDto) {
+    return this.flocksService.createFlock(createFlockDto);
+  }
+
+  @Post('barn/:barnId/mortality')
+  async logMortality(
+    @Param('barnId', ParseIntPipe) barnId: number,
+    @Body() mortalityDto: MortalityDto,
+  ) {
+    return this.flocksService.logMortality(barnId, mortalityDto);
   }
 
   @Post(':id/complete')
